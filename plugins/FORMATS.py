@@ -44,9 +44,9 @@ HELP_TEXT = """<b>⁉️ Hᴇʟʟᴏ {mention} ~
 <b><i>◈ Sᴛɪʟʟ ʜᴀᴠᴇ ᴅᴏᴜʙᴛs, ᴄᴏɴᴛᴀᴄᴛ ʙᴇʟᴏᴡ ᴘᴇʀsᴏɴs/ɢʀᴏᴜᴘ ᴀs ᴘᴇʀ ʏᴏᴜʀ ɴᴇᴇᴅ !</i></b>"""
 
 ABOUT_TXT = """<b>🤖 ᴍʏ ɴᴀᴍᴇ: {botname}
-<b>» ᴄʀᴇᴀᴛᴏʀ: <a href=https://t.me/Madhav_S9>sᴏʟᴏ</a>\n» ᴏᴜʀ ᴄᴏᴍᴍᴜɴɪᴛʏ : <a href=https://t.me/TEAM_HTX>ᴛᴇᴀᴍ ʜᴛx</a>\n» ᴀɴɪᴍᴇ ᴄʜᴀɴɴᴇʟ : <a href=https://t.me/anime_hindi_sub_industry>ᴀɴɪᴍᴇ ɪɴᴅᴜsᴛʀʏ</a>\n» ᴏɴɢᴏɪɴɢ ɪɴᴅᴜsᴛʀʏ : <a href=https://t.me/OngoingAnime_Industry>ᴏɴɢᴏɪɴɢ ɪɴᴅᴜsᴛʀʏ</a>\n» ɪɴᴅᴜsᴛʀʏ ɴᴇᴡs : <a href=https://t.me/Anime_News_Industry>ɪɴᴅᴜsᴛʀʏ ɴᴇᴡs</a>\n» ᴅᴇᴠᴇʟᴏᴘᴇʀ : <a href=https://t.me/i_killed_my_clan>ᴏʙɪᴛᴏ</a></b>",
+<b>» ᴄʀᴇᴀᴛᴏʀ: <a href=https://t.me/Madhav_S9>sᴏʟᴏ</a>\n» ᴏᴜʀ ᴄᴏᴍᴍᴜɴɪᴛʏ : <a href=https://t.me/TEAM_HTX>ᴛᴇᴀᴍ ʜᴛx</a>\n» ᴀɴɪᴍᴇ ᴄʜᴀɴɴᴇʟ : <a href=https://t.me/anime_hindi_sub_industry>ᴀɴɪᴍᴇ ɪɴᴅᴜsᴛʀʏ</a>\n» ᴏɴɢᴏɪɴɢ ɪɴᴅᴜsᴛʀʏ : <a href=https://t.me/OngoingAnime_Industry>ᴏɴɢᴏɪɴɢ ɪɴᴅᴜsᴛʀʏ</a>\n» ɪɴᴅᴜsᴛʀʏ ɴᴇᴡs : <a href=https://t.me/Anime_News_Industry>ɪɴᴅᴜsᴛʀʏ ɴᴇᴡs</a>\n» ᴅᴇᴠᴇʟᴏᴘᴇʀ : <a href=https://t.me/i_killed_my_clan>ᴏʙɪᴛᴏ</a></b>"""
 
-SETTING_TXT = """<b>⚙️ Cᴏɴғɪɢᴜʀᴀᴛɪᴏɴs</b>
+SETTING_TXT = """ <b>⚙️ Cᴏɴғɪɢᴜʀᴀᴛɪᴏɴs</b>
 <blockquote expandable>◈ ᴛᴏᴛᴀʟ ғᴏʀᴄᴇ sᴜʙ ᴄʜᴀɴɴᴇʟ:  <b>{total_fsub}</b>
 ◈ ᴛᴏᴛᴀʟ ᴀᴅᴍɪɴs:  <b>{total_admin}</b>
 ◈ ᴛᴏᴛᴀʟ ʙᴀɴɴᴇᴅ ᴜsᴇʀs:  <b>{total_ban}</b>
@@ -54,7 +54,7 @@ SETTING_TXT = """<b>⚙️ Cᴏɴғɪɢᴜʀᴀᴛɪᴏɴs</b>
 ◈ ᴘʀᴏᴛᴇᴄᴛ ᴄᴏɴᴛᴇɴᴛ:  <b>{protect_content}</b>
 ◈ ʜɪᴅᴇ ᴄᴀᴘᴛɪᴏɴ:  <b>{hide_caption}</b>
 ◈ ᴄʜᴀɴɴᴇʟ ʙᴜᴛᴛᴏɴ:  <b>{chnl_butn}</b>
-◈ ʀᴇǫᴜᴇsᴛ ғsᴜʙ ᴍᴏᴅᴇ: <b>{reqfsub}</b></blockquote>"""
+◈ ʀᴇǫᴜᴇsᴛ ғsᴜʙ ᴍᴏᴅᴇ: <b>{reqfsub}</b></blockquote> """
 
 on_txt, off_txt = "Eɴᴀʙʟᴇᴅ ✅", "Dɪsᴀʙʟᴇᴅ ❌"
 
