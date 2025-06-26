@@ -37,7 +37,7 @@ TG_BOT_WORKERS = int(os.environ.get("TG_BOT_WORKERS", "4"))
 PICS = (os.environ.get("PICS", "https://envs.sh/ZUb.png?2ftEB=1 https://envs.sh/ZUi.png?KNgjn=1 https://envs.sh/oD5.jpg https://envs.sh/7nm.jpg https://envs.sh/Chb.jpg")).split() #Required
 
 #set your Custom Caption here, Keep None for Disable Custom Caption
-CUSTOM_CAPTION = os.environ.get("CUSTOM_CAPTION", "<blockquote expandable>{filename}</blockquote></b>")
+CUSTOM_CAPTION = os.environ.get("CUSTOM_CAPTION", "<b><blockquote expandable>{filename}</blockquote></b>")
 
 LOG_FILE_NAME = "filesharingbot.txt"
 
