@@ -358,5 +358,66 @@ class SidDataBase:
         {"channel_id": channel_id},
         {"$set": {"expire_seconds": seconds}}
     )
+    async def get_search_mode():
+    data = await settings.find_one({"_id": "search"})
+    if not data:
+        await settings.insert_one({
+            "_id": "search",
+            "mode": "auto"
+        })
+        return "auto"
+    return data["mode"]
+
+async def set_search_mode(mode):
+    await settings.update_one(
+        {"_id": "search"},
+        {"$set": {"mode": mode}},
+        upsert=True
+    )
+
+# ------------------ GROUP APPROVAL ------------------
+
+async def approve_group(chat_id):
+    await approved_groups.update_one(
+        {"chat_id": chat_id},
+        {"$set": {"chat_id": chat_id}},
+        upsert=True
+    )
+
+async def remove_group(chat_id):
+    await approved_groups.delete_one({"chat_id": chat_id})
+
+async def is_group_approved(chat_id):
+    data = await approved_groups.find_one({"chat_id": chat_id})
+    return bool(data)
+
+# ------------------ CHANNEL INDEX ------------------
+
+async def add_channel(chat_id, title):
+    await channels.update_one(
+        {"chat_id": chat_id},
+        {"$set": {
+            "chat_id": chat_id,
+            "title": title,
+            "expire": 60,
+            "join_mode": "request"
+        }},
+        upsert=True
+    )
+
+async def remove_channel(chat_id):
+    await channels.delete_one({"chat_id": chat_id})
+
+async def update_channel(chat_id, data):
+    await channels.update_one(
+        {"chat_id": chat_id},
+        {"$set": data}
+    )
+
+async def search_channel(query):
+    cursor = channels.find({
+        "title": {"$regex": query, "$options": "i"}
+    })
+    return await cursor.to_list(length=20)
 
 kingdb = SidDataBase(DB_URI, DB_NAME)
