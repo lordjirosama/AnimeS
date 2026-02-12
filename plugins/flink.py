@@ -2,9 +2,6 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, CallbackQuery
 from bot import Bot
 
-try:
-    from .utils import Bot_config, Message_config # type: ignore
-
     ADMIN_USER = Bot_config.is_admin
     ENCODE_MSG = Message_config.encode
     GET_MESSAGE_ID = Message_config.get_message_id
