@@ -1,71 +1,56 @@
-# +++ Channel Search System +++
-
-import time
-import asyncio
-import random
-
-from bot import Bot
-from pyrogram import filters
+from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from config import PICS
-from database.database import kingdb
+from db.advanced_db import *
+import asyncio
 
+@Client.on_message(filters.text & filters.group)
+async def search_system(client, message):
 
-@Bot.on_message(filters.group & filters.text)
-async def group_channel_search(client, message):
-
-    keyword = message.text.strip()
-
-    if len(keyword) < 3:
+    approved = await is_group_approved(message.chat.id)
+    if not approved:
         return
 
-    # 🔎 Search from DB
-    channel_results = await kingdb.search_channels(keyword)
+    mode = await get_search_mode()
 
-    if not channel_results:
+    # COMMAND MODE
+    if mode == "command":
+        if not message.text.startswith("/search"):
+            return
+        query = message.text.replace("/search", "").strip()
+    else:
+        query = message.text.strip()
+
+    if len(query) < 3:
+        return
+
+    results = await search_channel(query)
+
+    if not results:
         return
 
     buttons = []
 
-    for channel in channel_results:
-        try:
-            # Join Mode Logic
-            if channel.get("join_mode") == "request":
-                link = await client.create_chat_invite_link(
-                    chat_id=channel["channel_id"],
-                    creates_join_request=True
-                )
-            else:
-                link = await client.create_chat_invite_link(
-                    chat_id=channel["channel_id"],
-                    expire_date=int(time.time()) + channel.get("expire_seconds", 3600),
-                    member_limit=1
-                )
+    for ch in results:
 
-            buttons.append([
-                InlineKeyboardButton(
-                    text=channel["title"],
-                    url=link.invite_link
-                )
-            ])
+        if ch["join_mode"] == "request":
+            link = await client.create_chat_invite_link(
+                ch["chat_id"],
+                creates_join_request=True
+            )
+        else:
+            link = await client.create_chat_invite_link(
+                ch["chat_id"],
+                member_limit=1
+            )
 
-        except Exception as e:
-            print("Invite Error:", e)
-            continue
+        buttons.append(
+            [InlineKeyboardButton(ch["title"], url=link.invite_link)]
+        )
 
-    if not buttons:
-        return
-
-    # 🔥 SAME START IMAGE STYLE
-    sent_msg = await message.reply_photo(
-        photo=random.choice(PICS),
-        caption="✨ <b>[ Your Results ]</b> ✨",
+    sent = await message.reply(
+        "🔍 Search Results:",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-    # 🗑 Auto Delete After 60 Sec
-    await asyncio.sleep(60)
-    try:
-        await sent_msg.delete()
-    except:
-        pass
+    await asyncio.sleep(results[0]["expire"])
+    await sent.delete()
