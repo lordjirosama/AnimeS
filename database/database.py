@@ -307,117 +307,102 @@ class SidDataBase:
         # Delete the document with the channel_id in store_reqLink_data
         await self.store_reqLink_data.delete_one({'_id': channel_id})
 
-    async def add_or_update_channel(
-    self,
-    channel_id: int,
-    title: str,
-    username: str = None,
-    join_mode: str = "normal",
-    expire_seconds: int = 3600,
-    added_by: int = None
-):
-    data = {
-        "channel_id": channel_id,
-        "title": title,
-        "username": username,
-        "join_mode": join_mode,
-        "expire_seconds": expire_seconds,
-        "is_indexed": True,
-        "added_by": added_by,
-        "added_at": datetime.utcnow()
-    }
+                # --- YAHAN SE ERROR FIX KIYA GAYA HAI (Line 310+) ---
 
-    await self.channels.update_one(
-        {"channel_id": channel_id},
-        {"$set": data},
-        upsert=True
-    )
+    async def add_or_update_channel(self, channel_id: int, title: str, username: str = None, join_mode: str = "normal", expire_seconds: int = 3600, added_by: int = None):
+        from datetime import datetime
+        data = {
+            "channel_id": channel_id,
+            "title": title,
+            "username": username,
+            "join_mode": join_mode,
+            "expire_seconds": expire_seconds,
+            "is_indexed": True,
+            "added_by": added_by,
+            "added_at": datetime.utcnow()
+        }
+        # Note: Ensure self.channels is defined in your __init__
+        await self.channel_data.update_one(
+            {"_id": channel_id},
+            {"$set": data},
+            upsert=True
+        )
     
     async def get_indexed_channels(self):
-    cursor = self.channels.find({"is_indexed": True})
-    return await cursor.to_list(length=None)
+        cursor = self.channel_data.find({"is_indexed": True})
+        return await cursor.to_list(length=None)
 
     async def search_channels(self, keyword: str):
-    regex = {"$regex": keyword, "$options": "i"}
-
-    cursor = self.channels.find({
-        "is_indexed": True,
-        "$or": [
-            {"title": regex},
-            {"username": regex}
-        ]
-    })
-
-    return await cursor.to_list(length=None)
+        regex = {"$regex": keyword, "$options": "i"}
+        cursor = self.channel_data.find({
+            "is_indexed": True,
+            "$or": [
+                {"title": regex},
+                {"username": regex}
+            ]
+        })
+        return await cursor.to_list(length=None)
     
     async def get_channel(self, channel_id: int):
-    return await self.channels.find_one({"channel_id": channel_id})
+        return await self.channel_data.find_one({"_id": channel_id})
     
     async def update_expire_time(self, channel_id: int, seconds: int):
-    await self.channels.update_one(
-        {"channel_id": channel_id},
-        {"$set": {"expire_seconds": seconds}}
-    )
-    async def get_search_mode():
-    data = await settings.find_one({"_id": "search"})
-    if not data:
-        await settings.insert_one({
-            "_id": "search",
-            "mode": "auto"
+        await self.channel_data.update_one(
+            {"_id": channel_id},
+            {"$set": {"expire_seconds": seconds}}
+        )
+
+    async def get_search_mode(self):
+        # Using self.database['settings'] as a fallback if settings isn't defined
+        settings_coll = self.database['settings']
+        data = await settings_coll.find_one({"_id": "search"})
+        if not data:
+            await settings_coll.insert_one({
+                "_id": "search",
+                "mode": "auto"
+            })
+            return "auto"
+        return data["mode"]
+
+    async def set_search_mode(self, mode):
+        settings_coll = self.database['settings']
+        await settings_coll.update_one(
+            {"_id": "search"},
+            {"$set": {"mode": mode}},
+            upsert=True
+        )
+
+    # ------------------ GROUP APPROVAL ------------------
+
+    async def approve_group(self, chat_id):
+        approved_groups = self.database['approved_groups']
+        await approved_groups.update_one(
+            {"chat_id": chat_id},
+            {"$set": {"chat_id": chat_id}},
+            upsert=True
+        )
+
+    async def remove_group(self, chat_id):
+        approved_groups = self.database['approved_groups']
+        await approved_groups.delete_one({"chat_id": chat_id})
+
+    async def is_group_approved(self, chat_id):
+        approved_groups = self.database['approved_groups']
+        data = await approved_groups.find_one({"chat_id": chat_id})
+        return bool(data)
+
+    # ------------------ CHANNEL INDEX (Updated) ------------------
+
+    async def update_channel(self, chat_id, data):
+        await self.channel_data.update_one(
+            {"_id": chat_id},
+            {"$set": data}
+        )
+
+    async def search_channel(self, query):
+        cursor = self.channel_data.find({
+            "title": {"$regex": query, "$options": "i"}
         })
-        return "auto"
-    return data["mode"]
-
-async def set_search_mode(mode):
-    await settings.update_one(
-        {"_id": "search"},
-        {"$set": {"mode": mode}},
-        upsert=True
-    )
-
-# ------------------ GROUP APPROVAL ------------------
-
-async def approve_group(chat_id):
-    await approved_groups.update_one(
-        {"chat_id": chat_id},
-        {"$set": {"chat_id": chat_id}},
-        upsert=True
-    )
-
-async def remove_group(chat_id):
-    await approved_groups.delete_one({"chat_id": chat_id})
-
-async def is_group_approved(chat_id):
-    data = await approved_groups.find_one({"chat_id": chat_id})
-    return bool(data)
-
-# ------------------ CHANNEL INDEX ------------------
-
-async def add_channel(chat_id, title):
-    await channels.update_one(
-        {"chat_id": chat_id},
-        {"$set": {
-            "chat_id": chat_id,
-            "title": title,
-            "expire": 60,
-            "join_mode": "request"
-        }},
-        upsert=True
-    )
-
-async def remove_channel(chat_id):
-    await channels.delete_one({"chat_id": chat_id})
-
-async def update_channel(chat_id, data):
-    await channels.update_one(
-        {"chat_id": chat_id},
-        {"$set": data}
-    )
-
-async def search_channel(query):
-    cursor = channels.find({
-        "title": {"$regex": query, "$options": "i"}
-    })
-    return await cursor.to_list(length=20)
+        return await cursor.to_list(length=20)
 
 kingdb = SidDataBase(DB_URI, DB_NAME)
