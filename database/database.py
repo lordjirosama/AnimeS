@@ -307,5 +307,56 @@ class SidDataBase:
         # Delete the document with the channel_id in store_reqLink_data
         await self.store_reqLink_data.delete_one({'_id': channel_id})
 
+    async def add_or_update_channel(
+    self,
+    channel_id: int,
+    title: str,
+    username: str = None,
+    join_mode: str = "normal",
+    expire_seconds: int = 3600,
+    added_by: int = None
+):
+    data = {
+        "channel_id": channel_id,
+        "title": title,
+        "username": username,
+        "join_mode": join_mode,
+        "expire_seconds": expire_seconds,
+        "is_indexed": True,
+        "added_by": added_by,
+        "added_at": datetime.utcnow()
+    }
+
+    await self.channels.update_one(
+        {"channel_id": channel_id},
+        {"$set": data},
+        upsert=True
+    )
+    
+    async def get_indexed_channels(self):
+    cursor = self.channels.find({"is_indexed": True})
+    return await cursor.to_list(length=None)
+
+    async def search_channels(self, keyword: str):
+    regex = {"$regex": keyword, "$options": "i"}
+
+    cursor = self.channels.find({
+        "is_indexed": True,
+        "$or": [
+            {"title": regex},
+            {"username": regex}
+        ]
+    })
+
+    return await cursor.to_list(length=None)
+    
+    async def get_channel(self, channel_id: int):
+    return await self.channels.find_one({"channel_id": channel_id})
+    
+    async def update_expire_time(self, channel_id: int, seconds: int):
+    await self.channels.update_one(
+        {"channel_id": channel_id},
+        {"$set": {"expire_seconds": seconds}}
+    )
 
 kingdb = SidDataBase(DB_URI, DB_NAME)
