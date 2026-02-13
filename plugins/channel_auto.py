@@ -1,5 +1,5 @@
 from pyrogram import Client
-from db.advanced_db import add_channel, remove_channel
+from database.database import add_channel, remove_channel
 from config import OWNER_ID
 
 @Client.on_chat_member_updated()
