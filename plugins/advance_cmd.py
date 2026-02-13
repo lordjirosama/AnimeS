@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from db.advanced_db import *
+from database.database import *
 from config import OWNER_ID
 
 # APPROVE GROUP
