@@ -3,6 +3,8 @@ import motor.motor_asyncio
 from config import DB_URI, DB_NAME
 
 class SidDataBase:
+# CHANNEL SAVE COLLECTION
+channels_col = db["channels"]
 
     def __init__(self, DB_URI, DB_NAME):
         self.dbclient = motor.motor_asyncio.AsyncIOMotorClient(DB_URI)
@@ -25,7 +27,7 @@ class SidDataBase:
         self.rqst_fsub_data = self.database['request_forcesub']
         self.rqst_fsub_Channel_data = self.database['request_forcesub_channel']
         self.store_reqLink_data = self.database['store_reqLink']
-    
+        
     
     # CHANNEL BUTTON SETTINGS
     async def set_channel_button_link(self, button_name: str, button_link: str):
@@ -390,6 +392,23 @@ class SidDataBase:
         approved_groups = self.database['approved_groups']
         data = await approved_groups.find_one({"chat_id": chat_id})
         return bool(data)
+
+    
+# ---------------- CHANNEL SYSTEM ---------------- #
+
+async def add_channel(channel_id: int):
+    found = await channels_col.find_one({"_id": channel_id})
+    if not found:
+        await channels_col.insert_one({"_id": channel_id})
+
+
+async def remove_channel(channel_id: int):
+    await channels_col.delete_one({"_id": channel_id})
+
+
+async def get_all_channels():
+    data = await channels_col.find().to_list(length=None)
+    return [x["_id"] for x in data]
 
     # ------------------ CHANNEL INDEX (Updated) ------------------
 
