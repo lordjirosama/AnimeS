@@ -1,6 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from db.advanced_db import *
+from database.database import *
 import asyncio
 
 @Client.on_message(filters.text & filters.group)
