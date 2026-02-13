@@ -3,8 +3,6 @@ import motor.motor_asyncio
 from config import DB_URI, DB_NAME
 
 class SidDataBase:
-# CHANNEL SAVE COLLECTION
-channels_col = db["channels"]
 
     def __init__(self, DB_URI, DB_NAME):
         self.dbclient = motor.motor_asyncio.AsyncIOMotorClient(DB_URI)
