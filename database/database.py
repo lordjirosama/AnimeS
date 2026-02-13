@@ -1,4 +1,3 @@
-
 import motor.motor_asyncio
 from config import DB_URI, DB_NAME
 
@@ -26,6 +25,8 @@ class SidDataBase:
         self.rqst_fsub_Channel_data = self.database['request_forcesub_channel']
         self.store_reqLink_data = self.database['store_reqLink']
         
+        
+        self.channels_col = self.database['channels'] # CHANNEL SAVE COLLECTION
     
     # CHANNEL BUTTON SETTINGS
     async def set_channel_button_link(self, button_name: str, button_link: str):
