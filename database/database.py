@@ -12,7 +12,7 @@ class SidDataBase:
         self.admins_data = self.database['admins']
         self.banned_user_data = self.database['banned_user']
         self.autho_user_data = self.database['autho_user']
-        
+        self.group_data = self.db.group_data
         self.auto_delete_data = self.database['auto_delete']
         self.hide_caption_data = self.database['hide_caption']
         self.protect_content_data = self.database['protect_content']
@@ -24,7 +24,9 @@ class SidDataBase:
         self.rqst_fsub_data = self.database['request_forcesub']
         self.rqst_fsub_Channel_data = self.database['request_forcesub_channel']
         self.store_reqLink_data = self.database['store_reqLink']
-        
+        self.group_data = self.database['groups']
+        self.settings = self.database['settings']
+        self.channels = self.database['channels']
         
         self.channels_col = self.database['channels'] # CHANNEL SAVE COLLECTION
     
@@ -422,5 +424,44 @@ async def get_all_channels():
             "title": {"$regex": query, "$options": "i"}
         })
         return await cursor.to_list(length=20)
+
+# GROUP APPROVAL SYSTEM
+async def approve_group(self, group_id: int):
+    await self.group_data.update_one(
+        {"_id": group_id},
+        {"$set": {"approved": True}},
+        upsert=True
+    )
+
+async def disapprove_group(self, group_id: int):
+    await self.group_data.delete_one({"_id": group_id})
+
+async def is_group_approved(self, group_id: int):
+    data = await self.group_data.find_one({"_id": group_id})
+    return bool(data)
+
+
+# SEARCH MODE
+async def set_search_mode(self, mode: str):
+    await self.settings.update_one(
+        {"_id": "search_mode"},
+        {"$set": {"mode": mode}},
+        upsert=True
+    )
+
+async def get_search_mode(self):
+    data = await self.settings.find_one({"_id": "search_mode"})
+    if data:
+        return data.get("mode", "auto")
+    return "auto"
+
+
+# CHANNEL UPDATE 
+async def update_channel(self, chat_id: int, data: dict):
+    await self.channels.update_one(
+        {"_id": chat_id},
+        {"$set": data},
+        upsert=True
+    )
 
 kingdb = SidDataBase(DB_URI, DB_NAME)
