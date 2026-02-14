@@ -1,17 +1,15 @@
 from pyrogram import Client, filters
-from database.database import kingdb
+from database.database import db   # ✅ ye hona chahiye
 from config import OWNER_ID
 
-# APPROVE GROUP
 @Client.on_message(filters.command("approvegroup") & filters.user(OWNER_ID))
 async def approve(client, message):
-    await kingdb.approve_group(message.chat.id)
+    await db.approve_group(message.chat.id)   # ✅ FIX
     await message.reply("✅ Group Approved")
 
-# REMOVE GROUP
 @Client.on_message(filters.command("removegroup") & filters.user(OWNER_ID))
 async def removegrp(client, message):
-    await kingdb.disapprove_group(message.chat.id)
+    await db.disapprove_group(message.chat.id)   # ✅ FIX
     await message.reply("❌ Group Removed")
 
 # SEARCH MODE (global)
