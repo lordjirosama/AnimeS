@@ -1,56 +1,63 @@
 from pyrogram import Client, filters
-from database.database import *
+from database.database import kingdb
 from config import OWNER_ID
 
 # APPROVE GROUP
 @Client.on_message(filters.command("approvegroup") & filters.user(OWNER_ID))
 async def approve(client, message):
-    await approve_group(message.chat.id)
+    await kingdb.approve_group(message.chat.id)
     await message.reply("✅ Group Approved")
 
 # REMOVE GROUP
 @Client.on_message(filters.command("removegroup") & filters.user(OWNER_ID))
 async def removegrp(client, message):
-    await remove_group(message.chat.id)
+    await kingdb.disapprove_group(message.chat.id)
     await message.reply("❌ Group Removed")
 
-# SEARCH MODE
+# SEARCH MODE (global)
 @Client.on_message(filters.command("searchmode") & filters.user(OWNER_ID))
 async def mode(client, message):
     if len(message.command) < 2:
-        return await message.reply("Use: /searchmode auto|command")
+        return await message.reply("Usage: /searchmode auto | command")
 
-    mode = message.command[1]
+    mode = message.command[1].lower()
 
     if mode not in ["auto", "command"]:
-        return await message.reply("auto or command only")
+        return await message.reply("❌ Only: auto / command")
 
-    await set_search_mode(mode)
-    await message.reply(f"✅ Mode set to {mode}")
+    await kingdb.set_search_mode(mode)
+    await message.reply(f"✅ Search Mode set to: {mode}")
 
-# SET EXPIRE
+# SET EXPIRE TIME
 @Client.on_message(filters.command("setexpire") & filters.user(OWNER_ID))
 async def setexpire(client, message):
     if len(message.command) < 3:
         return await message.reply("Usage: /setexpire channel_id seconds")
 
-    chat_id = int(message.command[1])
-    seconds = int(message.command[2])
+    try:
+        chat_id = int(message.command[1])
+        seconds = int(message.command[2])
+    except:
+        return await message.reply("❌ Invalid format")
 
-    await update_channel(chat_id, {"expire": seconds})
-    await message.reply("✅ Expire Updated")
+    await kingdb.update_channel(chat_id, {"expire": seconds})
+    await message.reply(f"✅ Expire set to {seconds} sec")
 
 # SET JOIN MODE
 @Client.on_message(filters.command("setjoinmode") & filters.user(OWNER_ID))
 async def setjoin(client, message):
     if len(message.command) < 3:
-        return await message.reply("Usage: /setjoinmode channel_id request|normal")
+        return await message.reply("Usage: /setjoinmode channel_id request | normal")
 
-    chat_id = int(message.command[1])
-    mode = message.command[2]
+    try:
+        chat_id = int(message.command[1])
+    except:
+        return await message.reply("❌ Invalid channel id")
+
+    mode = message.command[2].lower()
 
     if mode not in ["request", "normal"]:
-        return await message.reply("request or normal")
+        return await message.reply("❌ Only: request / normal")
 
-    await update_channel(chat_id, {"join_mode": mode})
-    await message.reply("✅ Join Mode Updated")
+    await kingdb.update_channel(chat_id, {"join_mode": mode})
+    await message.reply(f"✅ Join Mode set to {mode}")
