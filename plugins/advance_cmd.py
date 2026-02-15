@@ -3,6 +3,9 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQ
 from config import OWNER_ID, START_PIC, START_VIDEO
 from database import kingdb
 
+START_PIC = 
+START_VIDEO = START_VIDEO = None  # ya video link = None  # ya video link
+
 
 # =========================
 # MEDIA SENDER
