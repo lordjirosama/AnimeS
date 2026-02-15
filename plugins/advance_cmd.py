@@ -1,6 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from config import OWNER_ID, START_PIC, START_VIDEO
+from config import OWNER_ID
 from database import kingdb
 
 START_PIC = PICS.Config
