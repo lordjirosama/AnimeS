@@ -350,6 +350,9 @@ class SidDataBase:
     
     async def update_expire_time(self, channel_id: int, seconds: int):
     await self.update_channel(channel_id, {"expire_seconds": seconds})
+
+
+
     
     async def get_search_mode(self):
         # Using self.database['settings'] as a fallback if settings isn't defined
