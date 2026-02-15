@@ -367,39 +367,38 @@ class SidDataBase:
             {"$set": {"mode": mode}},
             upsert=True
         )
-
-    # ------------------ GROUP APPROVAL ------------------
+ # ------------------ GROUP APPROVAL ------------------
 
     async def approve_group(self, chat_id):
-    await self.group_data.update_one(
-        {"_id": chat_id},
-        {"$set": {"approved": True}},
-        upsert=True
-    )
+        await self.group_data.update_one(
+            {"_id": chat_id},
+            {"$set": {"approved": True}},
+            upsert=True
+        )
 
-async def disapprove_group(self, chat_id):
-    await self.group_data.update_one(
-        {"_id": chat_id},
-        {"$set": {"approved": False}}
-    )
+    async def disapprove_group(self, chat_id):
+        await self.group_data.update_one(
+            {"_id": chat_id},
+            {"$set": {"approved": False}}
+        )
 
-async def is_group_approved(self, chat_id):
-    data = await self.group_data.find_one({"_id": chat_id})
-    return data.get("approved", False) if data else False
+    async def is_group_approved(self, chat_id):
+        data = await self.group_data.find_one({"_id": chat_id})
+        return data.get("approved", False) if data else False
 
-# ================= CHANNEL UPDATE (IMPORTANT) =================
 
-async def update_channel(self, channel_id: int, data: dict):
+    # ================= CHANNEL UPDATE =================
 
-    if "expire" in data:
-        data["expire_seconds"] = data.pop("expire")
+    async def update_channel(self, channel_id: int, data: dict):
 
-    await self.channel_data.update_one(
-        {"_id": channel_id},
-        {"$set": data},
-        upsert=True
-    )
-    
+        if "expire" in data:
+            data["expire_seconds"] = data.pop("expire")
+
+        await self.channel_data.update_one(
+            {"_id": channel_id},
+            {"$set": data},
+            upsert=True
+        )
 # ---------------- CHANNEL SYSTEM ---------------- #
 
 async def add_channel(channel_id: int):
