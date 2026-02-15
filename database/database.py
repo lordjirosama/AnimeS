@@ -330,67 +330,87 @@ class SidDataBase:
             upsert=True
         )
     
-    async def get_indexed_channels(self):
-        cursor = self.channel_data.find({"is_indexed": True})
-        return await cursor.to_list(length=None)
-
-    async def search_channels(self, keyword: str):
-        regex = {"$regex": keyword, "$options": "i"}
-        cursor = self.channel_data.find({
-            "is_indexed": True,
-            "$or": [
-                {"title": regex},
-                {"username": regex}
-            ]
-        })
-        return await cursor.to_list(length=None)
     
-    async def get_channel(self, channel_id: int):
-        return await self.channel_data.find_one({"_id": channel_id})
+
     
-    async def get_search_mode(self):
-        # Using self.database['settings'] as a fallback if settings isn't defined
-        settings_coll = self.database['settings']
-        data = await settings_coll.find_one({"_id": "search"})
-        if not data:
-            await settings_coll.insert_one({
-                "_id": "search",
-                "mode": "auto"
-            })
-            return "auto"
-        return data["mode"]
+    # ================= GROUP SYSTEM ================= #
 
-    async def set_search_mode(self, mode):
-        settings_coll = self.database['settings']
-        await settings_coll.update_one(
-            {"_id": "search"},
-            {"$set": {"mode": mode}},
-            upsert=True
-        )
- # ------------------ GROUP APPROVAL ------------------
-
-    async def approve_group(self, chat_id):
+    async def approve_group(self, chat_id: int):
         await self.group_data.update_one(
             {"_id": chat_id},
             {"$set": {"approved": True}},
             upsert=True
         )
 
-    async def disapprove_group(self, chat_id):
+    async def disapprove_group(self, chat_id: int):
         await self.group_data.update_one(
             {"_id": chat_id},
-            {"$set": {"approved": False}}
+            {"$set": {"approved": False}},
+            upsert=True
         )
 
-    async def is_group_approved(self, chat_id):
+    async def is_group_approved(self, chat_id: int):
         data = await self.group_data.find_one({"_id": chat_id})
-        return data.get("approved", False) if data else False
 
+        if not data:
+            await self.group_data.insert_one({
+                "_id": chat_id,
+                "approved": False,
+                "search_mode": "auto"
+            })
+            return False
 
-    # ================= CHANNEL UPDATE =================
+        return data.get("approved", False)
+
+    # ================= SEARCH MODE ================= #
+
+    async def set_search_mode(self, chat_id: int, mode: str):
+        await self.group_data.update_one(
+            {"_id": chat_id},
+            {"$set": {"search_mode": mode}},
+            upsert=True
+        )
+
+    async def get_search_mode(self, chat_id: int):
+        data = await self.group_data.find_one({"_id": chat_id})
+
+        if not data:
+            await self.group_data.insert_one({
+                "_id": chat_id,
+                "approved": False,
+                "search_mode": "auto"
+            })
+            return "auto"
+
+        return data.get("search_mode", "auto")
+
+    # ================= CHANNEL SYSTEM ================= #
+
+    async def add_or_update_channel(
+        self,
+        channel_id: int,
+        title: str,
+        username: str = None,
+        join_mode: str = "direct",
+        expire_seconds: int = 600
+    ):
+        await self.channel_data.update_one(
+            {"_id": channel_id},
+            {
+                "$set": {
+                    "title": title,
+                    "username": username,
+                    "join_mode": join_mode,
+                    "expire_seconds": expire_seconds,
+                    "is_indexed": True
+                }
+            },
+            upsert=True
+        )
 
     async def update_channel(self, channel_id: int, data: dict):
 
+        # expire -> expire_seconds convert
         if "expire" in data:
             data["expire_seconds"] = data.pop("expire")
 
@@ -399,21 +419,25 @@ class SidDataBase:
             {"$set": data},
             upsert=True
         )
-# ---------------- CHANNEL SYSTEM ---------------- #
 
-async def add_channel(channel_id: int):
-    found = await channels_col.find_one({"_id": channel_id})
-    if not found:
-        await channels_col.insert_one({"_id": channel_id})
+    async def get_channel(self, channel_id: int):
+        return await self.channel_data.find_one({"_id": channel_id})
 
+    async def get_indexed_channels(self):
+        return await self.channel_data.find(
+            {"is_indexed": True}
+        ).to_list(length=None)
 
-async def remove_channel(channel_id: int):
-    await channels_col.delete_one({"_id": channel_id})
+    async def search_channel(self, keyword: str):
+        regex = {"$regex": keyword, "$options": "i"}
 
-
-async def get_all_channels():
-    data = await channels_col.find().to_list(length=None)
-    return [x["_id"] for x in data]
+        return await self.channel_data.find({
+            "is_indexed": True,
+            "$or": [
+                {"title": regex},
+                {"username": regex}
+            ]
+        }).to_list(length=None)
 
 
 kingdb = SidDataBase(DB_URI, DB_NAME)
