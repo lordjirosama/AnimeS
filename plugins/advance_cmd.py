@@ -4,7 +4,7 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from database import kingdb
+from database.database import kingdb
 from config import OWNER_ID
 
 # ================== CONFIG ==================
