@@ -349,11 +349,10 @@ class SidDataBase:
         return await self.channel_data.find_one({"_id": channel_id})
     
     async def update_expire_time(self, channel_id: int, seconds: int):
-        await self.channel_data.update_one(
-            {"_id": channel_id},
-            {"$set": {"expire_seconds": seconds}}
-        )
-
+    await self.channel_data.update_one(
+        {"_id": channel_id},
+        {"$set": {"expire_seconds": seconds}}
+    )
     async def get_search_mode(self):
         # Using self.database['settings'] as a fallback if settings isn't defined
         settings_coll = self.database['settings']
@@ -377,22 +376,30 @@ class SidDataBase:
     # ------------------ GROUP APPROVAL ------------------
 
     async def approve_group(self, chat_id):
-        approved_groups = self.database['approved_groups']
-        await approved_groups.update_one(
-            {"chat_id": chat_id},
-            {"$set": {"chat_id": chat_id}},
-            upsert=True
-        )
+    await self.group_data.update_one(
+        {"_id": chat_id},
+        {"$set": {"approved": True}},
+        upsert=True
+    )
 
-    async def remove_group(self, chat_id):
-        approved_groups = self.database['approved_groups']
-        await approved_groups.delete_one({"chat_id": chat_id})
+async def disapprove_group(self, chat_id):
+    await self.group_data.update_one(
+        {"_id": chat_id},
+        {"$set": {"approved": False}}
+    )
 
-    async def is_group_approved(self, chat_id):
-        approved_groups = self.database['approved_groups']
-        data = await approved_groups.find_one({"chat_id": chat_id})
-        return bool(data)
+async def is_group_approved(self, chat_id):
+    data = await self.group_data.find_one({"_id": chat_id})
+    return data.get("approved", False) if data else False
 
+# ================= CHANNEL UPDATE (IMPORTANT) =================
+
+async def update_channel(self, chat_id: int, data: dict):
+    await self.channel_data.update_one(
+        {"_id": chat_id},
+        {"$set": data},
+        upsert=True
+    )
     
 # ---------------- CHANNEL SYSTEM ---------------- #
 
