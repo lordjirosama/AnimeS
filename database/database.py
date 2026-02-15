@@ -348,12 +348,6 @@ class SidDataBase:
     async def get_channel(self, channel_id: int):
         return await self.channel_data.find_one({"_id": channel_id})
     
-    async def update_expire_time(self, channel_id: int, seconds: int):
-    await self.update_channel(channel_id, {"expire_seconds": seconds})
-
-
-
-    
     async def get_search_mode(self):
         # Using self.database['settings'] as a fallback if settings isn't defined
         settings_coll = self.database['settings']
