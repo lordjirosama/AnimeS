@@ -394,9 +394,13 @@ async def is_group_approved(self, chat_id):
 
 # ================= CHANNEL UPDATE (IMPORTANT) =================
 
-async def update_channel(self, chat_id: int, data: dict):
+async def update_channel(self, channel_id: int, data: dict):
+
+    if "expire" in data:
+        data["expire_seconds"] = data.pop("expire")
+
     await self.channel_data.update_one(
-        {"_id": chat_id},
+        {"_id": channel_id},
         {"$set": data},
         upsert=True
     )
