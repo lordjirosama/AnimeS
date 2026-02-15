@@ -1,59 +1,162 @@
-from database import kingdb  # ya jahan tera db instance hai
+from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from config import OWNER_ID, START_PIC, START_VIDEO
+from database import kingdb
 
-@Client.on_message(filters.command("approve"))
+
+# =========================
+# MEDIA SENDER
+# =========================
+async def send_media(message, text, buttons=None):
+    if START_VIDEO:
+        return await message.reply_video(
+            START_VIDEO,
+            caption=text,
+            reply_markup=buttons
+        )
+    elif START_PIC:
+        return await message.reply_photo(
+            START_PIC,
+            caption=text,
+            reply_markup=buttons
+        )
+    else:
+        return await message.reply_text(text, reply_markup=buttons)
+
+
+# =========================
+# APPROVE GROUP
+# =========================
+@Client.on_message(filters.command("approve") & filters.user(OWNER_ID))
 async def approve(client, message):
     await kingdb.approve_group(message.chat.id)
     await message.reply_text("✅ Group Approved")
-    
+
+
+# =========================
+# REMOVE GROUP
+# =========================
 @Client.on_message(filters.command("removegroup") & filters.user(OWNER_ID))
 async def removegrp(client, message):
-    await kingdb.disapprove_group(message.chat.id)   # ✅ FIX
+    await kingdb.disapprove_group(message.chat.id)
     await message.reply("❌ Group Removed")
 
-# SEARCH MODE (global)
+
+# =========================
+# SEARCH MODE (INLINE UI)
+# =========================
 @Client.on_message(filters.command("searchmode") & filters.user(OWNER_ID))
-async def mode(client, message):
-    if len(message.command) < 2:
-        return await message.reply("Usage: /searchmode auto | command")
+async def searchmode_ui(client, message):
 
-    mode = message.command[1].lower()
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("⚡ Auto Mode", callback_data="search_auto"),
+            InlineKeyboardButton("⌨ Command Mode", callback_data="search_command")
+        ]
+    ])
 
-    if mode not in ["auto", "command"]:
-        return await message.reply("❌ Only: auto / command")
+    await send_media(
+        message,
+        "⚙️ **Select Search Mode**",
+        buttons
+    )
+
+
+@Client.on_callback_query(filters.regex("^search_"))
+async def searchmode_callback(client, query: CallbackQuery):
+    mode = query.data.split("_")[1]
 
     await kingdb.set_search_mode(mode)
-    await message.reply(f"✅ Search Mode set to: {mode}")
 
-# SET EXPIRE TIME
-@Client.on_message(filters.command("setexpire") & filters.user(OWNER_ID))
-async def setexpire(client, message):
-    if len(message.command) < 3:
-        return await message.reply("Usage: /setexpire channel_id seconds")
+    await query.message.edit_text(
+        f"✅ Search Mode set to: **{mode.upper()}**"
+    )
 
-    try:
-        chat_id = int(message.command[1])
-        seconds = int(message.command[2])
-    except:
-        return await message.reply("❌ Invalid format")
 
-    await kingdb.update_channel(chat_id, {"expire": seconds})
-    await message.reply(f"✅ Expire set to {seconds} sec")
-
-# SET JOIN MODE
+# =========================
+# SET JOIN MODE (INLINE UI)
+# =========================
 @Client.on_message(filters.command("setjoinmode") & filters.user(OWNER_ID))
-async def setjoin(client, message):
-    if len(message.command) < 3:
-        return await message.reply("Usage: /setjoinmode channel_id request | normal")
+async def setjoin_ui(client, message):
+
+    if len(message.command) < 2:
+        return await message.reply("Usage: /setjoinmode channel_id")
 
     try:
         chat_id = int(message.command[1])
     except:
         return await message.reply("❌ Invalid channel id")
 
-    mode = message.command[2].lower()
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📩 Request Join", callback_data=f"join_request_{chat_id}"),
+            InlineKeyboardButton("🔓 Direct Join", callback_data=f"join_normal_{chat_id}")
+        ]
+    ])
 
-    if mode not in ["request", "normal"]:
-        return await message.reply("❌ Only: request / normal")
+    await send_media(
+        message,
+        "⚙️ **Select Join Mode**",
+        buttons
+    )
+
+
+@Client.on_callback_query(filters.regex("^join_"))
+async def joinmode_callback(client, query: CallbackQuery):
+    data = query.data.split("_")
+
+    mode = data[1]
+    chat_id = int(data[2])
 
     await kingdb.update_channel(chat_id, {"join_mode": mode})
-    await message.reply(f"✅ Join Mode set to {mode}")
+
+    await query.message.edit_text(
+        f"✅ Join Mode set to: **{mode.upper()}**"
+    )
+
+
+# =========================
+# SET EXPIRE (INLINE UI)
+# =========================
+@Client.on_message(filters.command("setexpire") & filters.user(OWNER_ID))
+async def expire_ui(client, message):
+
+    if len(message.command) < 2:
+        return await message.reply("Usage: /setexpire channel_id")
+
+    try:
+        chat_id = int(message.command[1])
+    except:
+        return await message.reply("❌ Invalid channel id")
+
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("10s", callback_data=f"exp_10_{chat_id}"),
+            InlineKeyboardButton("30s", callback_data=f"exp_30_{chat_id}"),
+            InlineKeyboardButton("60s", callback_data=f"exp_60_{chat_id}")
+        ],
+        [
+            InlineKeyboardButton("5 min", callback_data=f"exp_300_{chat_id}"),
+            InlineKeyboardButton("10 min", callback_data=f"exp_600_{chat_id}")
+        ]
+    ])
+
+    await send_media(
+        message,
+        "⏳ **Select Expire Time**",
+        buttons
+    )
+
+
+@Client.on_callback_query(filters.regex("^exp_"))
+async def expire_callback(client, query: CallbackQuery):
+    data = query.data.split("_")
+
+    seconds = int(data[1])
+    chat_id = int(data[2])
+
+    await kingdb.update_channel(chat_id, {"expire": seconds})
+
+    await query.message.edit_text(
+        f"✅ Expire set to: **{seconds} sec**"
+    )
