@@ -1,7 +1,7 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from config import OWNER_ID
-from database import kingdb
+from database.database import kingdb
 
 START_PIC = PICS.Config
 START_VIDEO = START_VIDEO.Config  # ya video link = None  # ya video link
