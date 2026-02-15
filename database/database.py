@@ -439,5 +439,21 @@ class SidDataBase:
             ]
         }).to_list(length=None)
 
+    
+# ---------------- CHANNEL SYSTEM ---------------- #
 
+async def add_channel(channel_id: int):
+    found = await channels_col.find_one({"_id": channel_id})
+    if not found:
+        await channels_col.insert_one({"_id": channel_id})
+
+
+async def remove_channel(channel_id: int):
+    await channels_col.delete_one({"_id": channel_id})
+
+
+async def get_all_channels():
+    data = await channels_col.find().to_list(length=None)
+    return [x["_id"] for x in data]
+    
 kingdb = SidDataBase(DB_URI, DB_NAME)
