@@ -4,7 +4,7 @@ from config import OWNER_ID, START_PIC, START_VIDEO
 from database import kingdb
 
 START_PIC = PICS.Config
-START_VIDEO = START_VIDEO = None  # ya video link = None  # ya video link
+START_VIDEO = START_VIDEO.Config  # ya video link = None  # ya video link
 
 
 # =========================
