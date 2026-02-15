@@ -1,32 +1,46 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from config import OWNER_ID, START_PIC, START_VIDEO
 from database.database import kingdb
-
-START_PIC = PICS.Config
-START_VIDEO = START_VIDEO.Config  # ya video link = None  # ya video link
-
+import random
+from config import OWNER_ID, PICS, VIDEOS
 
 # =========================
 # MEDIA SENDER
 # =========================
 async def send_media(message, text, buttons=None):
-    if START_VIDEO:
-        return await message.reply_video(
-            START_VIDEO,
-            caption=text,
-            reply_markup=buttons
-        )
-    elif START_PIC:
+
+    pic = random.choice(PICS) if PICS else None
+
+    if pic:
         return await message.reply_photo(
-            START_PIC,
+            photo=pic,
             caption=text,
             reply_markup=buttons
         )
     else:
+        return await message.reply_text(
+            text,
+            reply_markup=buttons
+        )
+
+async def send_media(message, text, buttons=None):
+
+    if VIDEOS:
+        return await message.reply_video(
+            video=random.choice(VIDEOS),
+            caption=text,
+            reply_markup=buttons
+        )
+
+    elif PICS:
+        return await message.reply_photo(
+            photo=random.choice(PICS),
+            caption=text,
+            reply_markup=buttons
+        )
+
+    else:
         return await message.reply_text(text, reply_markup=buttons)
-
-
 # =========================
 # APPROVE GROUP
 # =========================
