@@ -4,7 +4,7 @@ from database.database import kingdb
 from config import OWNER_ID
 import asyncio
 
-
+from bot import Bot
 command_list = [
     'start', 'users', 'broadcast', 'batch', 'genlink', 'help', 'cmd', 'info',
     'add_fsub', 'fsub_chnl', 'restart', 'del_fsub', 'add_admins', 'del_admins',
