@@ -5,8 +5,17 @@ from config import OWNER_ID
 import asyncio
 
 
-@Client.on_message(filters.private & filters.text & ~filters.command(["start","help","setexpire","setjoinmode","approvegroup","disapprovegroup","setsearchmode"]))
-async def pm_search(client, message):
+command_list = [
+    'start', 'users', 'broadcast', 'batch', 'genlink', 'help', 'cmd', 'info',
+    'add_fsub', 'fsub_chnl', 'restart', 'del_fsub', 'add_admins', 'del_admins',
+    'admin_list', 'cancel', 'auto_del', 'forcesub', 'files', 'add_banuser',
+    'del_banuser', 'banuser_list', 'status', 'req_fsub', 'setexpire',
+    'setjoinmode', 'approvegroup', 'disapprovegroup', 'setsearchmode', 'flink'
+]
+
+@Bot.on_message(~filters.command(command_list) & filters.private & is_admin)
+async def pm_filter_handler(bot, message):
+    await message.reply_text("Yeh non-command private admin message hai")
 
     user_id = message.from_user.id
     text = message.text.strip()
