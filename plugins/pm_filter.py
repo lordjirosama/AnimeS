@@ -5,7 +5,7 @@ from config import OWNER_ID
 import asyncio
 
 
-@Client.on_message(filters.private & filters.text)
+@Client.on_message(filters.private & filters.text & ~filters.command(["start","help","setexpire","setjoinmode","approvegroup","disapprovegroup","setsearchmode"]))
 async def pm_search(client, message):
 
     user_id = message.from_user.id
