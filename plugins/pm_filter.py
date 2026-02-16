@@ -44,7 +44,7 @@ async def pm_filter_handler(bot, message):
             return
 
     # ---------------- SEARCH ----------------
-    results = await kingdb.search_channels(query)
+    results = await kingdb.search_channel(query)
 
     if not results:
         return await message.reply("❌ No results found")
