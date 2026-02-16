@@ -1,29 +1,35 @@
 from pyrogram import Client
-from database.database import add_channel, remove_channel
-from config import OWNER_ID
+from database.database import kingdb
+
 
 @Client.on_chat_member_updated()
-async def auto_index(client, update):
+async def auto_index_channel(client, event):
 
-    me = await client.get_me()
-
-    if update.new_chat_member.user.id != me.id:
+    # SAFETY CHECK
+    if not event.new_chat_member:
         return
 
-    chat = update.chat
+    if not event.new_chat_member.user:
+        return
 
-    # BOT ADDED
-    if update.new_chat_member.status in ["administrator", "member"]:
+    # BOT ID
+    bot_id = (await client.get_me()).id
 
-        inviter = update.from_user.id
+    # CHECK BOT ADDED
+    if event.new_chat_member.user.id != bot_id:
+        return
 
-        if inviter == OWNER_ID:
-            await add_channel(chat.id, chat.title)
-            print("Indexed:", chat.title)
-        else:
-            await client.leave_chat(chat.id)
+    chat = event.chat
 
-    # BOT REMOVED
-    if update.new_chat_member.status == "left":
-        await remove_channel(chat.id)
-        print("Removed:", chat.title)
+    # ONLY CHANNEL / GROUP
+    if chat.type not in ["channel", "supergroup"]:
+        return
+
+    # SAVE TO DB
+    await kingdb.add_or_update_channel(
+        channel_id=chat.id,
+        title=chat.title,
+        username=chat.username
+    )
+
+    print(f"✅ Indexed: {chat.title} ({chat.id})")
