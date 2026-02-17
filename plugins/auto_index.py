@@ -1,62 +1,93 @@
+# +++ INDEX SYSTEM (CMD + FORWARD FLOW) +++
+
 from bot import Bot
-from pyrogram.types import ChatMemberUpdated
+from pyrogram import filters
+from pyrogram.types import Message
 from database.database import kingdb
-from config import OWNER_ID
+from config import OWNER_ID, LOG_CHANNEL
+index_wait = set()  # users waiting for forward
 
 
-@Bot.on_chat_member_updated()
-async def auto_index(client, event: ChatMemberUpdated):
+# =========================================================
+# 🔥 STEP 1: /index COMMAND
+# =========================================================
+
+@Bot.on_message(filters.command("index") & filters.private)
+async def index_cmd(client: Bot, message: Message):
+
+    user_id = message.from_user.id
+
+    admins = await kingdb.get_all_admins()
+
+    if user_id != OWNER_ID and user_id not in admins:
+        return await message.reply("❌ You are not allowed")
+
+    index_wait.add(user_id)
+
+    await message.reply(
+        "📥 Forward any channel post to index it\n\n"
+        "⚠️ Bot must be admin in that channel"
+    )
+
+
+# =========================================================
+# 🔥 STEP 2: FORWARD HANDLER
+# =========================================================
+
+@Bot.on_message(filters.forwarded & filters.private)
+async def index_forward(client: Bot, message: Message):
+
+    user_id = message.from_user.id
+
+    if user_id not in index_wait:
+        return  # ignore random forwards
+
+    if not message.forward_from_chat:
+        return await message.reply("❌ Forward a channel post")
+
+    chat = message.forward_from_chat
+
+    if chat.type != "channel":
+        return await message.reply("❌ Only channel allowed")
+
+    # check bot admin
+    bot_id = (await client.get_me()).id
 
     try:
-        # 🔒 Safety checks
-        if not event.new_chat_member:
-            return
+        member = await client.get_chat_member(chat.id, bot_id)
+    except:
+        return await message.reply("❌ Bot not in channel")
 
-        if not event.new_chat_member.user:
-            return
+    if member.status not in ["administrator", "creator"]:
+        return await message.reply("❌ Bot must be admin")
 
-        # 🤖 Bot ID
-        bot_id = (await client.get_me()).id
+    # SAVE TO DB
+    await kingdb.add_or_update_channel(
+        channel_id=chat.id,
+        title=chat.title,
+        username=chat.username
+    )
 
-        # ✅ Check bot added / promoted
-        if event.new_chat_member.user.id != bot_id:
-            return
+    # remove from waiting
+    index_wait.remove(user_id)
 
-        # ✅ Only channel (group hata diya intentionally)
-        if event.chat.type != "channel":
-            return
+    # reply
+    await message.reply(
+        f"✅ Channel Indexed Successfully\n\n"
+        f"📛 {chat.title}\n"
+        f"🆔 `{chat.id}`"
+    )
 
-        # ✅ Only when bot becomes admin
-        if event.new_chat_member.status != "administrator":
-            return
+    print(f"✅ Indexed: {chat.title}")
 
-        # 👤 Kisne add kiya
-        adder = event.from_user
-        if not adder:
-            return
-
-        # 🔐 Permission check (OWNER ya DB admins)
-        if adder.id == OWNER_ID:
-            allowed = True
-        else:
-            admins = await kingdb.get_all_admins()
-            allowed = adder.id in admins
-
-        if not allowed:
-            print("❌ Unauthorized add, leaving...")
-            await client.leave_chat(event.chat.id)
-            return
-
-        # 💾 SAVE CHANNEL (INDEX)
-        await kingdb.add_or_update_channel(
-            channel_id=event.chat.id,
-            title=event.chat.title,
-            username=event.chat.username,
-            join_mode="direct",       # default fix
-            expire_seconds=600        # default fix
+    # LOG
+    try:
+        await client.send_message(
+            LOG_CHANNEL,
+            f"📥 NEW CHANNEL INDEXED\n\n"
+            f"👤 User: {message.from_user.mention}\n"
+            f"📛 {chat.title}\n"
+            f"🆔 `{chat.id}`"
         )
-
-        print(f"✅ Indexed: {event.chat.title} ({event.chat.id})")
-
-    except Exception as e:
-        print("❌ AUTO INDEX ERROR:", e)
+    except:
+        pass
