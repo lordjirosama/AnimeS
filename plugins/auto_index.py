@@ -1,57 +1,62 @@
-# +++ Auto Channel Index System +++
-
 from bot import Bot
 from pyrogram.types import ChatMemberUpdated
-from config import OWNER_ID
 from database.database import kingdb
+from config import OWNER_ID
 
 
 @Bot.on_chat_member_updated()
-async def auto_index_channel(client, event: ChatMemberUpdated):
+async def auto_index(client, event: ChatMemberUpdated):
 
-    # 1️⃣ Check bot itself is updated
-    if event.new_chat_member.user.id != client.me.id:
-        return
-
-    # 2️⃣ Only for channels
-    if event.chat.type != "channel":
-        return
-
-    # 3️⃣ Bot must become administrator
-    if event.new_chat_member.status != "administrator":
-        return
-
-    adder = event.from_user
-    if not adder:
-        return
-
-    # 4️⃣ Check if allowed (Owner or DB Admin)
-    if adder.id == OWNER_ID:
-        allowed = True
-    else:
-        admins = await kingdb.get_all_admins()
-        allowed = adder.id in admins
-
-    if not allowed:
-        print("❌ Unauthorized user tried to add bot.")
-        try:
-            await client.leave_chat(event.chat.id)
-        except:
-            pass
-        return
-
-    # 5️⃣ Auto Index Channel
     try:
+        # 🔒 Safety checks
+        if not event.new_chat_member:
+            return
+
+        if not event.new_chat_member.user:
+            return
+
+        # 🤖 Bot ID
+        bot_id = (await client.get_me()).id
+
+        # ✅ Check bot added / promoted
+        if event.new_chat_member.user.id != bot_id:
+            return
+
+        # ✅ Only channel (group hata diya intentionally)
+        if event.chat.type != "channel":
+            return
+
+        # ✅ Only when bot becomes admin
+        if event.new_chat_member.status != "administrator":
+            return
+
+        # 👤 Kisne add kiya
+        adder = event.from_user
+        if not adder:
+            return
+
+        # 🔐 Permission check (OWNER ya DB admins)
+        if adder.id == OWNER_ID:
+            allowed = True
+        else:
+            admins = await kingdb.get_all_admins()
+            allowed = adder.id in admins
+
+        if not allowed:
+            print("❌ Unauthorized add, leaving...")
+            await client.leave_chat(event.chat.id)
+            return
+
+        # 💾 SAVE CHANNEL (INDEX)
         await kingdb.add_or_update_channel(
             channel_id=event.chat.id,
             title=event.chat.title,
             username=event.chat.username,
-            join_mode="normal",        # default mode
-            expire_seconds=3600,       # default 1 hour
-            added_by=adder.id
+            join_mode="direct",       # default fix
+            expire_seconds=600        # default fix
         )
 
-        print(f"✅ Channel Auto Indexed: {event.chat.title}")
+        print(f"✅ Indexed: {event.chat.title} ({event.chat.id})")
 
     except Exception as e:
-        print("Auto Index Error:", e)
+        print("❌ AUTO INDEX ERROR:", e)
