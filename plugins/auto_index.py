@@ -1,93 +1,101 @@
-# +++ INDEX SYSTEM (CMD + FORWARD FLOW) +++
-
-from bot import Bot
 from pyrogram import filters
-from pyrogram.types import Message
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from bot import Bot
 from database.database import kingdb
 from config import OWNER_ID, LOG_CHANNEL
-index_wait = set()  # users waiting for forward
+from datetime import datetime
 
 
-# =========================================================
-# 🔥 STEP 1: /index COMMAND
-# =========================================================
+# ================= INDEX COMMAND ================= #
 
 @Bot.on_message(filters.command("index") & filters.private)
-async def index_cmd(client: Bot, message: Message):
+async def index_cmd(client, message):
 
     user_id = message.from_user.id
-
     admins = await kingdb.get_all_admins()
 
     if user_id != OWNER_ID and user_id not in admins:
         return await message.reply("❌ You are not allowed")
 
-    index_wait.add(user_id)
-
     await message.reply(
-        "📥 Forward any channel post to index it\n\n"
-        "⚠️ Bot must be admin in that channel"
+        "📥 Forward channel post to index\n⚠️ Bot must be admin"
     )
 
 
-# =========================================================
-# 🔥 STEP 2: FORWARD HANDLER
-# =========================================================
+# ================= FORWARD INDEX ================= #
 
-@Bot.on_message(filters.forwarded & filters.private)
-async def index_forward(client: Bot, message: Message):
+@Bot.on_message(filters.private & filters.forwarded)
+async def index_forward(client, message):
 
     user_id = message.from_user.id
+    admins = await kingdb.get_all_admins()
 
-    if user_id not in index_wait:
-        return  # ignore random forwards
+    if user_id != OWNER_ID and user_id not in admins:
+        return
 
-    if not message.forward_from_chat:
-        return await message.reply("❌ Forward a channel post")
+    if not message.sender_chat:
+        return await message.reply("❌ Forward from channel only")
 
-    chat = message.forward_from_chat
+    chat = message.sender_chat
 
     if chat.type != "channel":
         return await message.reply("❌ Only channel allowed")
 
-    # check bot admin
-    bot_id = (await client.get_me()).id
+    now = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
-    try:
-        member = await client.get_chat_member(chat.id, bot_id)
-    except:
-        return await message.reply("❌ Bot not in channel")
-
-    if member.status not in ["administrator", "creator"]:
-        return await message.reply("❌ Bot must be admin")
-
-    # SAVE TO DB
+    # ================= SAVE ================= #
     await kingdb.add_or_update_channel(
         channel_id=chat.id,
         title=chat.title,
-        username=chat.username
+        username=chat.username,
+        join_mode="direct",
+        expire_seconds=600
     )
 
-    # remove from waiting
-    index_wait.remove(user_id)
+    await kingdb.update_channel(chat.id, {
+        "chat_id": chat.id,
+        "title": chat.title,
+        "username": chat.username,
+        "is_private": chat.username is None,
+        "added_by": user_id,
+        "added_time": now
+    })
 
-    # reply
-    await message.reply(
-        f"✅ Channel Indexed Successfully\n\n"
-        f"📛 {chat.title}\n"
-        f"🆔 `{chat.id}`"
+    # ================= INLINE BUTTON ================= #
+    buttons = [
+        [InlineKeyboardButton("🗑 Remove Channel", callback_data=f"remove_{chat.id}")]
+    ]
+
+    # ================= LOG CHANNEL ================= #
+    await client.send_message(
+        LOG_CHANNEL,
+        f"📥 **NEW CHANNEL INDEXED**\n\n"
+        f"📺 **Name:** {chat.title}\n"
+        f"🆔 **ID:** `{chat.id}`\n"
+        f"👤 **Added By:** `{user_id}`\n"
+        f"⏰ **Time:** {now}",
+        reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-    print(f"✅ Indexed: {chat.title}")
+    # OPTIONAL reply
+    await message.reply("✅ Channel Indexed & Logged")
 
-    # LOG
-    try:
-        await client.send_message(
-            LOG_CHANNEL,
-            f"📥 NEW CHANNEL INDEXED\n\n"
-            f"👤 User: {message.from_user.mention}\n"
-            f"📛 {chat.title}\n"
-            f"🆔 `{chat.id}`"
-        )
-    except:
-        pass
+
+# ================= REMOVE CALLBACK ================= #
+
+@Bot.on_callback_query(filters.regex("^remove_"))
+async def remove_channel_callback(client, query):
+
+    user_id = query.from_user.id
+    admins = await kingdb.get_all_admins()
+
+    if user_id != OWNER_ID and user_id not in admins:
+        return await query.answer("❌ Not allowed", show_alert=True)
+
+    chat_id = int(query.data.split("_")[1])
+
+    await kingdb.del_channel(chat_id)
+
+    await query.message.edit_text(
+        f"🗑 Channel Removed\n🆔 `{chat_id}`"
+    )
