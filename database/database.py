@@ -452,6 +452,10 @@ async def remove_channel(channel_id: int):
     await channels_col.delete_one({"_id": channel_id})
 
 
+async def delete_channel(self, chat_id):
+    await self.col.delete_one({"_id": chat_id})
+    
+
 async def get_all_channels():
     data = await channels_col.find().to_list(length=None)
     return [x["_id"] for x in data]
