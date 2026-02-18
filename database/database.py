@@ -26,10 +26,8 @@ class SidDataBase:
         self.store_reqLink_data = self.database['store_reqLink']
         self.group_data = self.database['groups']
         self.settings = self.database['settings']
-        self.channels = self.database['channels']
-        
-        self.channels_col = self.database['channels'] # CHANNEL SAVE COLLECTION
-    
+        self.channels_col = self.database['saved_channels']
+
     # CHANNEL BUTTON SETTINGS
     async def set_channel_button_link(self, button_name: str, button_link: str):
         await self.channel_button_link_data.delete_many({})  # Remove all existing documents
@@ -459,5 +457,31 @@ async def delete_channel(self, chat_id):
 async def get_all_channels():
     data = await channels_col.find().to_list(length=None)
     return [x["_id"] for x in data]
-    
+
+    # ================= FILE SAVE SYSTEM (Saved Channels) ================= #
+
+    async def add_save_channel(self, channel_id: int):
+        await self.channels_col.update_one(
+            {"_id": channel_id},
+            {"$set": {"_id": channel_id}},
+            upsert=True
+        )
+
+    async def remove_save_channel(self, channel_id: int):
+        await self.channels_col.delete_one({"_id": channel_id})
+
+    async def get_all_save_channels(self):
+        data = await self.channels_col.find().to_list(length=None)
+        return [x["_id"] for x in data]
+        
+    # to delete channel from Index list
+    async def del_channel(self, channel_id: int):
+        await self.channel_data.delete_one({"_id": channel_id})
+
+    async def update_channel_join_mode(self, channel_id, mode: str):
+        await self.channel_data.update_one(
+            {"_id": int(channel_id)},
+            {"$set": {"join_mode": mode}}
+        )
+        
 kingdb = SidDataBase(DB_URI, DB_NAME)
