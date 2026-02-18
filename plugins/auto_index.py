@@ -27,24 +27,33 @@ async def index_cmd(client, message):
         "_(Note: Bot wahan admin hona chahiye)_"
     )
 
-# ================= 2. FORWARD HANDLER ================= #
-@Bot.on_message(filters.private & filters.forwarded)
+# ================= 2. FORWARD HANDLER (PRIORITY FIXED) ================= #
+# group=-1 ka matlab hai ye sabse pehle run hoga
+@Bot.on_message(filters.private & filters.forwarded, group=-1)
 async def index_forward(client, message):
     user_id = message.from_user.id
+    
+    # Agar banda wait list me NAHI hai, toh ye function yahi ruk jayega 
+    # aur File Share wala code chalne dega.
     if user_id not in index_wait:
         return
 
+    # Agar banda wait list me HAI, toh hum File Share ko rok denge
     index_wait.remove(user_id)
+    
+    # Source detection
     chat = message.forward_from_chat or message.sender_chat
 
     if not chat:
-        return await message.reply("❌ **Error:** Proper Channel/Group se forward karo.")
+        await message.reply("❌ **Error:** Proper Channel/Group se forward karo.")
+        return message.stop_propagation() # Stop processing here
 
     try:
         # Default Settings: Direct Mode, 600s Expire
+        # added_by ab database me fix hai, toh ye error nahi dega
         await kingdb.add_or_update_channel(
             channel_id=chat.id,
-            title=chat.title,
+            title=chat.title or "Unknown Title",
             username=chat.username,
             join_mode="direct",
             expire_seconds=600,
@@ -58,7 +67,7 @@ async def index_forward(client, message):
             f"⚙️ **Mode:** Direct Join"
         )
 
-        # Log
+        # Log to Channel
         await client.send_message(
             LOG_CHANNEL,
             f"✅ **NEW INDEX ADDED**\n\n📛 {chat.title}\n🆔 `{chat.id}`\n👤 By: {message.from_user.mention}\n⏰ {get_time()}",
@@ -68,9 +77,14 @@ async def index_forward(client, message):
     except Exception as e:
         await message.reply(f"❌ **Error:** {e}")
 
+    # 🛑 Yahan hum process rok rahe hain taaki 'Below is your link' wala msg na aaye
+    message.stop_propagation()
+
 # ================= 3. AUTO ADD (Bot Added to Channel) ================= #
 @Bot.on_chat_member_updated()
 async def auto_index_on_add(client, event: ChatMemberUpdated):
+    
+    # Check agar naya member khud BOT hai
     if not event.new_chat_member or event.new_chat_member.user.id != client.me.id:
         return
 
@@ -82,10 +96,11 @@ async def auto_index_on_add(client, event: ChatMemberUpdated):
     try:
         await kingdb.add_or_update_channel(
             channel_id=chat.id,
-            title=chat.title,
+            title=chat.title or "Unknown",
             username=chat.username,
             join_mode="direct",
-            expire_seconds=600
+            expire_seconds=600,
+            added_by=client.me.id
         )
 
         await client.send_message(
