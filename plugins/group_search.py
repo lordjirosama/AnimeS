@@ -1,12 +1,13 @@
 import asyncio
+import random
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import Bot
 from database.database import kingdb
+from config import PICS  # <--- Config se import kiya
 
-# Configuration
-RESULT_PIC = "https://graph.org/file/5e5420317666c5476537c.jpg" # Apni Image Link Lagao
-AUTO_DELETE_TIME = 300 # 5 Minutes
+# Auto Delete Time (Seconds)
+AUTO_DELETE_TIME = 300 
 
 @Bot.on_message(filters.text & filters.group)
 async def group_search_handler(client, message):
@@ -17,7 +18,7 @@ async def group_search_handler(client, message):
     if not await kingdb.is_group_approved(chat_id):
         return
 
-    # 2. Check Search Mode (Auto vs Command)
+    # 2. Check Search Mode
     mode = await kingdb.get_search_mode(chat_id)
     
     query = ""
@@ -25,12 +26,12 @@ async def group_search_handler(client, message):
         if text.lower().startswith("/search "):
             query = text.replace("/search ", "", 1).strip()
         else:
-            return # Ignore normal text
+            return 
     elif mode == "auto":
-        if text.startswith("/"): return # Ignore commands
+        if text.startswith("/"): return 
         query = text
     
-    if len(query) < 2: return # Too short
+    if len(query) < 2: return 
 
     # 3. Search Database
     results = await kingdb.search_channels(query)
@@ -42,33 +43,29 @@ async def group_search_handler(client, message):
             await msg.delete()
         return
 
-    # 4. Generate Buttons based on Join Mode
+    # 4. Generate Buttons
     buttons = []
-    for ch in results[:10]: # Top 10 results
+    for ch in results[:10]: 
         try:
             channel_id = ch["_id"]
             join_mode = ch.get("join_mode", "direct")
             title = ch.get("title", "Unknown Channel")
             
-            # Link Creation Logic
             if join_mode == "request":
-                # Request Admin Approval Link
                 link = await client.create_chat_invite_link(channel_id, creates_join_request=True)
             else:
-                # Direct Join Link (1 Member Limit for auto-revoke feel)
                 link = await client.create_chat_invite_link(channel_id, member_limit=1)
 
             buttons.append([InlineKeyboardButton(f"🎬 {title}", url=link.invite_link)])
             
         except Exception as e:
-            print(f"Link Error for {channel_id}: {e}")
             continue
 
     if not buttons: return
 
-    # 5. Send Result
+    # 5. Send Result (Random Pic from Config)
     sent = await message.reply_photo(
-        photo=RESULT_PIC,
+        photo=random.choice(PICS),  # <--- Random Pic Yahan
         caption=f"🔍 **Your Results for:** `{query}`\n\n👇 **Click below to watch/download:**",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
