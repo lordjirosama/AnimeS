@@ -483,5 +483,27 @@ async def get_all_channels():
             {"_id": int(channel_id)},
             {"$set": {"join_mode": mode}}
         )
+
+# ================= 1. INDEXING & SEARCH SYSTEM ================= #
+
+    async def add_or_update_channel(self, channel_id: int, title: str, username: str = None, join_mode: str = "direct", expire_seconds: int = 600, added_by: int = None):
         
+        data = {
+            "title": title,
+            "username": username,
+            "join_mode": join_mode,
+            "expire_seconds": expire_seconds,
+            "is_indexed": True,
+            "updated_at": datetime.now()
+        }
+        
+        # Agar added_by aa raha hai toh save karo
+        if added_by:
+            data["added_by"] = added_by
+
+        await self.channel_data.update_one(
+            {"_id": channel_id},
+            {"$set": data},
+            upsert=True
+        )
 kingdb = SidDataBase(DB_URI, DB_NAME)
