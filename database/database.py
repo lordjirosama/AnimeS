@@ -308,29 +308,6 @@ class SidDataBase:
         # Delete the document with the channel_id in store_reqLink_data
         await self.store_reqLink_data.delete_one({'_id': channel_id})
 
-            
-    async def add_or_update_channel(self, channel_id: int, title: str, username: str = None, join_mode: str = "normal", expire_seconds: int = 3600, added_by: int = None):
-        from datetime import datetime
-        data = {
-            "channel_id": channel_id,
-            "title": title,
-            "username": username,
-            "join_mode": join_mode,
-            "expire_seconds": expire_seconds,
-            "is_indexed": True,
-            "added_by": added_by,
-            "added_at": datetime.utcnow()
-        }
-        # Note: Ensure self.channels is defined in your __init__
-        await self.channel_data.update_one(
-            {"_id": channel_id},
-            {"$set": data},
-            upsert=True
-        )
-    
-    
-
-    
     # ================= GROUP SYSTEM ================= #
 
     async def approve_group(self, chat_id: int):
