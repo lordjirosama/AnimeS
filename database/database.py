@@ -361,28 +361,6 @@ class SidDataBase:
 
     # ================= CHANNEL SYSTEM ================= #
 
-    async def add_or_update_channel(
-        self,
-        channel_id: int,
-        title: str,
-        username: str = None,
-        join_mode: str = "direct",
-        expire_seconds: int = 600
-    ):
-        await self.channel_data.update_one(
-            {"_id": channel_id},
-            {
-                "$set": {
-                    "title": title,
-                    "username": username,
-                    "join_mode": join_mode,
-                    "expire_seconds": expire_seconds,
-                    "is_indexed": True
-                }
-            },
-            upsert=True
-        )
-
     async def update_channel(self, channel_id: int, data: dict):
 
         # expire -> expire_seconds convert
@@ -415,27 +393,29 @@ class SidDataBase:
         }).to_list(length=None)
 
     
-# ---------------- CHANNEL SYSTEM ---------------- #
+# ================= CORRECTED INDEXING SYSTEM ================= #
 
-async def add_channel(channel_id: int):
-    found = await channels_col.find_one({"_id": channel_id})
-    if not found:
-        await channels_col.insert_one({"_id": channel_id})
+    async def add_or_update_channel(self, channel_id: int, title: str, username: str = None, join_mode: str = "direct", expire_seconds: int = 600, added_by: int = None):
+        data = {
+            "title": title,
+            "username": username,
+            "join_mode": join_mode,
+            "expire_seconds": expire_seconds,
+            "is_indexed": True,
+            "updated_at": datetime.now()
+        }
+        
+        # Ye line Error fix karegi
+        if added_by:
+            data["added_by"] = added_by
 
+        await self.channel_data.update_one(
+            {"_id": channel_id},
+            {"$set": data},
+            upsert=True
+        )
 
-async def remove_channel(channel_id: int):
-    await channels_col.delete_one({"_id": channel_id})
-
-
-async def delete_channel(self, chat_id):
-    await self.col.delete_one({"_id": chat_id})
-    
-
-async def get_all_channels():
-    data = await channels_col.find().to_list(length=None)
-    return [x["_id"] for x in data]
-
-    # ================= FILE SAVE SYSTEM (Saved Channels) ================= #
+    # ================= FILE SHARE SAVE SYSTEM (Saved Channels) ================= #
 
     async def add_save_channel(self, channel_id: int):
         await self.channels_col.update_one(
@@ -451,36 +431,24 @@ async def get_all_channels():
         data = await self.channels_col.find().to_list(length=None)
         return [x["_id"] for x in data]
         
-    # to delete channel from Index list
+    # Index se channel delete karne ke liye
     async def del_channel(self, channel_id: int):
         await self.channel_data.delete_one({"_id": channel_id})
 
+    # Particular Join Mode ke liye
     async def update_channel_join_mode(self, channel_id, mode: str):
         await self.channel_data.update_one(
             {"_id": int(channel_id)},
             {"$set": {"join_mode": mode}}
         )
 
-# ================= 1. INDEXING & SEARCH SYSTEM ================= #
-
-    async def add_or_update_channel(self, channel_id: int, title: str, username: str = None, join_mode: str = "direct", expire_seconds: int = 600, added_by: int = None):
-        
-        data = {
-            "title": title,
-            "username": username,
-            "join_mode": join_mode,
-            "expire_seconds": expire_seconds,
+    # Search fix
+    async def search_channels(self, keyword: str):
+        regex = {"$regex": keyword, "$options": "i"}
+        return await self.channel_data.find({
             "is_indexed": True,
-            "updated_at": datetime.now()
-        }
-        
-        # Agar added_by aa raha hai toh save karo
-        if added_by:
-            data["added_by"] = added_by
+            "$or": [{"title": regex}, {"username": regex}]
+        }).to_list(length=None)
 
-        await self.channel_data.update_one(
-            {"_id": channel_id},
-            {"$set": data},
-            upsert=True
-        )
+# Class khatam hone ke baad:
 kingdb = SidDataBase(DB_URI, DB_NAME)
