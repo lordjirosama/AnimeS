@@ -20,7 +20,11 @@ CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002465721727"))
 
 #OWNER ID --⚠️ REQUIRED--
 OWNER_ID = int(os.environ.get("OWNER_ID", "5585016974"))
-LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1001234567890"))
+# Agar aisi line hai:
+# LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "-100123456789") 
+
+# Toh use aise change kar de (int lagana zaroori hai):
+LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1002465721727"))
 #SUPPORT_GROUP: This is used for normal users for getting help if they don't understand how to use the bot --⚠ OPTIONAL--
 SUPPORT_GROUP = os.environ.get("SUPPORT_GROUP", "-1002020461301")
 
