@@ -9,7 +9,7 @@ async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
     return user_id == OWNER_ID or user_id in admins
 
-@Bot.on_message(filters.command("search") & filters.private)
+@Bot.on_message(filters.command("search") & filters.private, group=-1)
 async def admin_pm_search(client, message):
     
     user_id = message.from_user.id
@@ -18,10 +18,13 @@ async def admin_pm_search(client, message):
     if not await is_admin(user_id):
         return await message.reply("❌ **Sirf Admins hi PM me search kar sakte hain.**")
 
+    # 👇 YEH LINE ADD KARDO (Isse 'BELOW IS YOUR LINK' nahi aayega)
+    message.stop_propagation()
+
     # 2. Query Check
     if len(message.command) < 2:
         return await message.reply("ℹ️ **Usage:** `/search movie_name`")
-
+        
     query = message.text.split(" ", 1)[1].strip()
     
     # 3. Search DB
