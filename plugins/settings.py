@@ -7,7 +7,7 @@ from database.database import kingdb
 from config import OWNER_ID
 
 # ================= RANDOM PICS FOR SETTINGS ================= #
-SETTINGS_PICS = (os.environ.get("PICS", "https://envs.sh/ZUb.png?2ftEB=1 https://envs.sh/ZUi.png?KNgjn=1 https://envs.sh/oD5.jpg https://envs.sh/7nm.jpg https://envs.sh/Chb.jpg")).split() #Required
+SETTINGS_PICS = ["https://envs.sh/ZUb.png?2ftEB=1 https://envs.sh/ZUi.png?KNgjn=1 https://envs.sh/oD5.jpg https://envs.sh/7nm.jpg https://envs.sh/Chb.jpg"] #Required
 
 # --- HELPERS ---
 async def is_admin(user_id):
