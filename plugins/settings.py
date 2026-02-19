@@ -7,8 +7,13 @@ from database.database import kingdb
 from config import OWNER_ID
 
 # ================= RANDOM PICS FOR SETTINGS ================= #
-SETTINGS_PICS = ["https://envs.sh/ZUb.png?2ftEB=1 https://envs.sh/ZUi.png?KNgjn=1 https://envs.sh/oD5.jpg https://envs.sh/7nm.jpg https://envs.sh/Chb.jpg"] #Required
-
+SETTINGS_PICS = [
+    "https://envs.sh/ZUb.png?2ftEB=1",
+    "https://envs.sh/ZUi.png?KNgjn=1",
+    "https://envs.sh/oD5.jpg",
+    "https://envs.sh/7nm.jpg",
+    "https://envs.sh/Chb.jpg"
+] 
 # --- HELPERS ---
 async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
