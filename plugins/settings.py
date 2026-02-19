@@ -14,6 +14,7 @@ SETTINGS_PICS = [
     "https://envs.sh/7nm.jpg",
     "https://envs.sh/Chb.jpg"
 ] 
+
 # --- HELPERS ---
 async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
@@ -128,42 +129,48 @@ async def get_linkexpire_ui():
     ])
     return text, markup
 
-# ================= COMMANDS ================= #
 
-@Bot.on_message(filters.command("approve") & filters.group)
+# ================= COMMANDS (SUPER HIGH PRIORITY: group=-2) ================= #
+
+@Bot.on_message(filters.command("approve") & filters.group, group=-2)
 async def approve_cmd(client, message):
     if not await is_admin(message.from_user.id): return
     text, markup = await get_approve_ui(message.chat.id)
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
+    message.stop_propagation()
 
-@Bot.on_message(filters.command("searchmode") & filters.group)
+@Bot.on_message(filters.command("searchmode") & filters.group, group=-2)
 async def search_mode_cmd(client, message):
     if not await is_admin(message.from_user.id): return
     text, markup = await get_searchmode_ui(message.chat.id)
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
+    message.stop_propagation()
 
-@Bot.on_message(filters.command("autodelete"))
+@Bot.on_message(filters.command("autodelete"), group=-2)
 async def auto_delete_cmd(client, message):
     if not await is_admin(message.from_user.id): return
     text, markup = await get_autodel_ui()
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
+    message.stop_propagation()
 
-@Bot.on_message(filters.command("setjoinmode") & (filters.private | filters.group), group=-1)
+@Bot.on_message(filters.command("setjoinmode"), group=-2)
 async def set_join_mode_cmd(client, message):
     if not await is_admin(message.from_user.id): return
     text, markup = await get_joinmode_ui()
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
     message.stop_propagation()
 
-@Bot.on_message(filters.command("setexpire") & (filters.private | filters.group), group=-1)
+@Bot.on_message(filters.command("setexpire"), group=-2)
 async def set_expire_cmd(client, message):
     if not await is_admin(message.from_user.id): return
     text, markup = await get_linkexpire_ui()
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
     message.stop_propagation()
-# ================= CALLBACKS ================= #
 
-@Bot.on_callback_query()
+
+# ================= CALLBACKS (BUTTON CLICKS: SUPER HIGH PRIORITY) ================= #
+# Yahan sirf settings_ ke buttons pakdenge taaki dusre code kharab na ho
+@Bot.on_callback_query(filters.regex(r"^(close_panel|toggle_approve|approve_refresh|smode_|autodel_|gmode_|joinmode_|part_|expire_)"), group=-2)
 async def settings_callback(client, query):
     data = query.data
     chat_id = query.message.chat.id
@@ -284,10 +291,11 @@ async def settings_callback(client, query):
         except ValueError:
             await client.send_message(chat_id, "❗️ Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ..\n\nRᴇᴀsᴏɴ: Invalid number.")
 
-@Bot.on_message(filters.reply & filters.private)
+@Bot.on_message(filters.reply & filters.private, group=-2)
 async def particular_reply_handler(client, message):
     if not message.reply_to_message.reply_markup: return
     if not isinstance(message.reply_to_message.reply_markup, ForceReply): return
+    if "Please send the Channel ID" not in message.reply_to_message.text: return
 
     try:
         channel_id = int(message.text.strip())
@@ -302,5 +310,6 @@ async def particular_reply_handler(client, message):
             caption=f"⚙️ **Settings for:** `{ch.get('title')}`\nSelect the desired join mode:", 
             reply_markup=InlineKeyboardMarkup(btn)
         )
+        message.stop_propagation()
     except ValueError:
         await message.reply("❌ Please send a valid numeric ID (e.g., -100...).")
