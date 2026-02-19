@@ -148,18 +148,19 @@ async def auto_delete_cmd(client, message):
     text, markup = await get_autodel_ui()
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
 
-@Bot.on_message(filters.command("setjoinmode") & filters.private)
+@Bot.on_message(filters.command("setjoinmode") & (filters.private | filters.group), group=-1)
 async def set_join_mode_cmd(client, message):
     if not await is_admin(message.from_user.id): return
     text, markup = await get_joinmode_ui()
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
+    message.stop_propagation()
 
-@Bot.on_message(filters.command("setexpire") & filters.private)
+@Bot.on_message(filters.command("setexpire") & (filters.private | filters.group), group=-1)
 async def set_expire_cmd(client, message):
     if not await is_admin(message.from_user.id): return
     text, markup = await get_linkexpire_ui()
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
-
+    message.stop_propagation()
 # ================= CALLBACKS ================= #
 
 @Bot.on_callback_query()
