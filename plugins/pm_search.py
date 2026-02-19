@@ -33,7 +33,7 @@ async def admin_pm_search(client, message):
     if not results:
         return await message.reply(f"❌ **Koi result nahi mila:** `{query}`")
 
-    # 4. Buttons
+# 4. Buttons
     buttons = []
     for ch in results[:10]: 
         try:
@@ -42,13 +42,17 @@ async def admin_pm_search(client, message):
             title = ch.get("title", "Unknown")
 
             if join_mode == "request":
+                # Request link channels/groups dono me chalta hai
                 link = await client.create_chat_invite_link(channel_id, creates_join_request=True)
             else:
-                link = await client.create_chat_invite_link(channel_id, member_limit=1)
+                # YAHAN SE 'member_limit=1' HATA DIYA HAI 
+                link = await client.create_chat_invite_link(channel_id)
 
             buttons.append([InlineKeyboardButton(f"🎬 {title}", url=link.invite_link)])
 
         except Exception as e:
+            # Ab agar koi error aayega toh tere console me dikhega
+            print(f"Link Error: {e}")
             continue
 
     if not buttons:
