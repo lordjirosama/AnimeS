@@ -132,42 +132,54 @@ async def get_linkexpire_ui():
 
 # ================= COMMANDS (SUPER HIGH PRIORITY: group=-2) ================= #
 
-@Bot.on_message(filters.command("approve") & filters.group, group=-2)
+# ================= COMMANDS (SUPER HIGH PRIORITY: group=-2) ================= #
+
+@Bot.on_message(filters.command("approve") & (filters.group | filters.private), group=-2)
 async def approve_cmd(client, message):
     if not await is_admin(message.from_user.id): return
-    text, markup = await get_approve_ui(message.chat.id)
+    # Agar PM me daala toh id puchega, nahi toh chat ki id lega
+    chat_id = message.chat.id if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP] else None
+    
+    if not chat_id:
+        return await message.reply("❌ Yeh command Group mein use karein.")
+        
+    text, markup = await get_approve_ui(chat_id)
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
     message.stop_propagation()
 
-@Bot.on_message(filters.command("searchmode") & filters.group, group=-2)
+@Bot.on_message(filters.command("searchmode") & (filters.group | filters.private), group=-2)
 async def search_mode_cmd(client, message):
     if not await is_admin(message.from_user.id): return
-    text, markup = await get_searchmode_ui(message.chat.id)
+    chat_id = message.chat.id if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP] else None
+    
+    if not chat_id:
+        return await message.reply("❌ Yeh command Group mein use karein.")
+        
+    text, markup = await get_searchmode_ui(chat_id)
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
     message.stop_propagation()
 
-@Bot.on_message(filters.command("autodelete"), group=-2)
+@Bot.on_message(filters.command("autodelete") & (filters.private | filters.group), group=-2)
 async def auto_delete_cmd(client, message):
     if not await is_admin(message.from_user.id): return
     text, markup = await get_autodel_ui()
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
     message.stop_propagation()
 
-@Bot.on_message(filters.command("setjoinmode"), group=-2)
+@Bot.on_message(filters.command("setjoinmode") & (filters.private | filters.group), group=-2)
 async def set_join_mode_cmd(client, message):
     if not await is_admin(message.from_user.id): return
     text, markup = await get_joinmode_ui()
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
     message.stop_propagation()
 
-@Bot.on_message(filters.command("setexpire"), group=-2)
+@Bot.on_message(filters.command("setexpire") & (filters.private | filters.group), group=-2)
 async def set_expire_cmd(client, message):
     if not await is_admin(message.from_user.id): return
     text, markup = await get_linkexpire_ui()
     await message.reply_photo(photo=random.choice(SETTINGS_PICS), caption=text, reply_markup=markup)
     message.stop_propagation()
-
-
+    
 # ================= CALLBACKS (BUTTON CLICKS: SUPER HIGH PRIORITY) ================= #
 # Yahan sirf settings_ ke buttons pakdenge taaki dusre code kharab na ho
 @Bot.on_callback_query(filters.regex(r"^(close_panel|toggle_approve|approve_refresh|smode_|autodel_|gmode_|joinmode_|part_|expire_)"), group=-2)
