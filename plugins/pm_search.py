@@ -6,7 +6,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import Bot
 from database.database import kingdb
 from config import OWNER_ID, PICS  
-from anilist import AniLister # Import your class here
+from .anilist import AniLister # Import your class here
 
 async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
