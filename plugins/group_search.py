@@ -6,7 +6,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMedi
 from bot import Bot
 from database.database import kingdb
 from config import PICS  
-from anilist import AniLister
+from .anilist import AniLister
 
 AUTO_DELETE_TIME = 300 # 5 Minutes
 
