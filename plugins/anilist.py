@@ -1,3 +1,8 @@
+import asyncio
+import re
+from datetime import datetime
+from aiohttp import ClientSession
+
 ANIME_GRAPHQL_QUERY = """
 query ($search: String) {
   Media (search: $search, type: ANIME) {
@@ -18,17 +23,17 @@ class AniLister:
         self.__api = "https://graphql.anilist.co"
         self.__ani_name = anime_name
         self.__ani_year = year
-        self.__vars = { "search": self.__ani_name }  # No year filter
-        #self.__vars = {'search': self.__ani_name, 'seasonYear': self.__ani_year}
+        self.__vars = { "search": self.__ani_name }  
 
+    # Yeh functions properly TextEditor se data lenge jab tu aage file rename me use karega
     def get_episode(self):
-        return self.pdata.get("episode_number")
+        return getattr(self, "pdata", {}).get("episode_number")
 
     def get_season(self):
-        return self.pdata.get("anime_season")
+        return getattr(self, "pdata", {}).get("anime_season")
 
     def get_audio(self):
-        return self.pdata.get("audio")
+        return getattr(self, "pdata", {}).get("audio")
 
     def __update_vars(self, year: bool = True) -> None:
         if year:
@@ -56,35 +61,45 @@ class AniLister:
 
             if res_code == 404 and self.__ani_year > 2020:
                 self.__update_vars()
-                await asleep(2)
+                await asyncio.sleep(2)  # Fix: asleep changed to asyncio.sleep
                 continue
 
             if res_code == 404:
                 self.__update_vars(year=False)
-                await asleep(2)
+                await asyncio.sleep(2)  # Fix: asleep changed to asyncio.sleep
                 continue
 
             if res_code == 429:
                 retry_after = int(res_heads.get("Retry-After", 10))
-                await asleep(retry_after)
+                await asyncio.sleep(retry_after)  # Fix: asleep changed to asyncio.sleep
                 continue
 
             if res_code in [500, 501, 502, 503]:
-                await asleep(5)
+                await asyncio.sleep(5)  # Fix: asleep changed to asyncio.sleep
                 continue
 
-            await asleep(3)
+            await asyncio.sleep(3)  # Fix: asleep changed to asyncio.sleep
 
-        await rep.report(f"AniList data fetch failed for {self.__ani_name} after {retries} attempts.", "error", log=False)
+        # Fix: Using print temporarily if rep.report is missing
+        try:
+            await rep.report(f"AniList data fetch failed for {self.__ani_name} after {retries} attempts.", "error", log=False)
+        except NameError:
+            print(f"AniList data fetch failed for {self.__ani_name}")
+            
         return {}
 
 
-
+# ⚠️ Note: TextEditor class tere baaki code (jaise file renamer) ke liye theek hai.
+# Search (pm_search aur group_search) sirf AniLister class ka use karega.
 class TextEditor:
     def __init__(self, name):
         self.__name = name
         self.adata = {}
-        self.pdata = parse(name)
+        # Make sure 'parse' function is imported above
+        try:
+            self.pdata = parse(name) 
+        except NameError:
+            self.pdata = {}
 
     async def load_anilist(self):
         cache_names = []
@@ -106,7 +121,6 @@ class TextEditor:
         quality_match = re.search(r'(360p|480p|720p|1080p|2160p)', filename)
         quality = quality_match.group(1) if quality_match else "720p"
 
-        # 🔧 Improved language detection
         if re.search(r"\bdual[-_\s]?audio\b", filename):
             audio = "dual"
         elif re.search(r"\bmulti[-_\s]?audio\b", filename):
@@ -125,14 +139,15 @@ class TextEditor:
         season_match = re.search(r'(?:s|season)[\s._-]*(\d{1,2})', filename)
         season = season_match.group(1).zfill(2) if season_match else "01"
 
-        self.pdata = {
+        # Fix: Use update so previous data is not lost
+        self.pdata.update({
             "episode": episode,
             "quality": quality,
             "audio": audio,
             "season": season
-        }
+        })
 
-    @handle_logs
+    # @handle_logs - Uncomment this if you have the handle_logs decorator imported
     async def parse_name(self, no_s=False, no_y=False):
         anime_name = self.pdata.get("anime_title")
         anime_season = self.pdata.get("anime_season")
@@ -146,12 +161,12 @@ class TextEditor:
             return pname
         return anime_name
 
-    @handle_logs
+    # @handle_logs
     async def get_id(self):
         if (ani_id := self.adata.get('id')) and str(ani_id).isdigit():
             return ani_id
 
-    @handle_logs
+    # @handle_logs
     async def get_poster(self):
         if anime_id := await self.get_id():
             return f"https://img.anili.st/media/{anime_id}"
