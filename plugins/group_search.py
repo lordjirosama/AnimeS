@@ -6,10 +6,19 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot import Bot
 from database.database import kingdb
 from config import PICS  
+from anilist import AniLister # Import your class here
 
 AUTO_DELETE_TIME = 300 # 5 Minutes
 
-@Bot.on_message(filters.text & filters.group)
+async def fetch_anilist_data(query):
+    try:
+        anilister = AniLister(query, datetime.now().year)
+        data = await anilister.get_anidata()
+        return data
+    except Exception:
+        return {}
+
+@Bot.on_message(filters.text & filters.group, group=-1)
 async def group_search_handler(client, message):
     chat_id = message.chat.id
     text = message.text.strip()
@@ -28,11 +37,15 @@ async def group_search_handler(client, message):
     
     if len(query) < 2: return 
 
-    results = await kingdb.search_channels(query)
+    # ✈️ AEROPLANE SPEED
+    db_task = asyncio.create_task(kingdb.search_channels(query))
+    ani_task = asyncio.create_task(fetch_anilist_data(query))
+    
+    results, ani_data = await asyncio.gather(db_task, ani_task)
     
     if not results:
         if mode == "command":
-            msg = await message.reply("❌ **Nᴏ Rᴇsᴜʟᴛs Fᴏᴜɴᴅ Fᴏʀ:** `{}`".format(query), quote=True)
+            msg = await message.reply(f"❌ **No Results Found For:** `{query}`", quote=True)
             await asyncio.sleep(10)
             await msg.delete()
         return
@@ -45,10 +58,7 @@ async def group_search_handler(client, message):
             expire_seconds = ch.get("expire_seconds", 0)
             title = ch.get("title", "Unknown Channel")
             
-            # Expire time logic
-            expire_date = None
-            if expire_seconds > 0:
-                expire_date = datetime.now() + timedelta(seconds=expire_seconds)
+            expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
 
             if join_mode == "request":
                 link = await client.create_chat_invite_link(channel_id, creates_join_request=True, expire_date=expire_date)
@@ -56,28 +66,53 @@ async def group_search_handler(client, message):
                 link = await client.create_chat_invite_link(channel_id, expire_date=expire_date)
 
             buttons.append([InlineKeyboardButton(f"🎬 {title}", url=link.invite_link)])
-            
-        except Exception as e:
+        except Exception:
             continue
 
     if not buttons: return
 
-    # --- ✨ NEW PREMIUM UI CAPTION ✨ ---
-    caption = (
-        "🍿 𝗦𝗲𝗮𝗿𝗰𝗵 𝗥𝗲𝘀𝘂𝗹𝘁𝘀 𝗙𝗼𝘂𝗻𝗱!\n\n"
-        f"📝 Qᴜᴇʀʏ: `{query}`\n"
-        f"📊 Rᴇsᴜʟᴛs: `{len(buttons)}` Lɪɴᴋ(s) Gᴇɴᴇʀᴀᴛᴇᴅ\n\n"
-        "👇 Cʟɪᴄᴋ ᴏɴ ᴛʜᴇ ʙᴜᴛᴛᴏɴs ʙᴇʟᴏᴡ ᴛᴏ ᴀᴄᴄᴇss:\n"
-        f"⏳ Tʜɪs ᴍᴇssᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ ɪɴ {AUTO_DELETE_TIME // 60} ᴍɪɴᴜᴛᴇs._"
-    )
+    # --- PREMIUM UI BUILDER ---
+    if ani_data:
+        title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or query.title()
+        ani_type = ani_data.get('format', 'Unknown')
+        status = ani_data.get('status', 'Unknown')
+        episodes = ani_data.get('episodes', 'N/A')
+        year = ani_data.get('seasonYear', 'N/A')
+        genres = ", ".join(ani_data.get('genres', [])[:3]) if ani_data.get('genres') else "N/A"
+        
+        synopsis = str(ani_data.get('description', 'No synopsis available.'))
+        synopsis = synopsis.replace("<br>", "").replace("<i>", "").replace("</i>", "")
+        if len(synopsis) > 200:
+            synopsis = synopsis[:200] + "..."
+
+        ani_id = ani_data.get('id')
+        poster = f"https://img.anili.st/media/{ani_id}" if ani_id else random.choice(PICS)
+
+        caption = (
+            f"<blockquote>**{title}**</blockquote>\n\n"
+            f"✦ **Type:** {ani_type}   |   **Status:** {status}\n"
+            f"✦ **Episodes:** {episodes}   |   **Year:** {year}\n"
+            f"✦ **Genres:** {genres}\n"
+            f"✦ **Synopsis:** {synopsis}\n\n"
+            "👇 **Please click the buttons below to access your files:**\n"
+            f"⏳ _This message will be deleted in {AUTO_DELETE_TIME // 60} minutes._"
+        )
+    else:
+        poster = random.choice(PICS)
+        caption = (
+            f"<blockquote>**{query.title()}**</blockquote>\n\n"
+            "✦ **Status:** Found in Database ✅\n"
+            f"✦ **Results:** `{len(buttons)}` Links Generated\n\n"
+            "👇 **Please click the buttons below to access your files:**\n"
+            f"⏳ _This message will be deleted in {AUTO_DELETE_TIME // 60} minutes._"
+        )
 
     sent = await message.reply_photo(
-        photo=random.choice(PICS), 
+        photo=poster, 
         caption=caption,
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-    # Auto Delete
     await asyncio.sleep(AUTO_DELETE_TIME)
     try:
         await sent.delete()
