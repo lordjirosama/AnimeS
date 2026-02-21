@@ -1,4 +1,3 @@
-
 import random
 import asyncio
 import re
@@ -52,7 +51,7 @@ async def fast_anilist_fetch(query, req_type="ALL"):
             return {}
 
 # --- FAST SEARCH & CHANNEL LIST GENERATOR ---
-async def perform_search_list(client, message, query, req_type="ALL"):
+async def perform_search_list(client, message, query, req_type="ALL", is_callback=False):
     safe_query = re.sub(r'[*?+^$[\](){}|\\.]', '', query).strip()
     results = await kingdb.search_channels(safe_query)
     
@@ -62,7 +61,10 @@ async def perform_search_list(client, message, query, req_type="ALL"):
         filtered = results
 
     if not filtered:
-        return await message.reply(f"❌ **No Results Found For:** `{query}`")
+        if is_callback:
+            return await message.reply(f"❌ **No Results Found For:** `{query}`")
+        else:
+            return await message.reply(f"❌ **No Results Found For:** `{query}`")
 
     buttons = []
     # Seedha channels ki list banegi jaisa pehle tha
@@ -72,7 +74,8 @@ async def perform_search_list(client, message, query, req_type="ALL"):
 
     caption = f"🔍 **Search results for:** `{query}`\n\n👇 **Please select a channel below:**"
     
-    if hasattr(message, "edit_media"):
+    # CRASH FIX: Properly checking is_callback flag
+    if is_callback:
         await message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=caption), reply_markup=InlineKeyboardMarkup(buttons))
     else:
         await message.reply_photo(photo=random.choice(PICS), caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
@@ -81,30 +84,37 @@ async def perform_search_list(client, message, query, req_type="ALL"):
 @Bot.on_message(filters.command("anime") & filters.private, group=-1)
 async def pm_anime_cmd(client, message):
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/anime <name>`")
-    await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "anime")
+    await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "anime", is_callback=False)
     message.stop_propagation()
 
 @Bot.on_message(filters.command("manga") & filters.private, group=-1)
 async def pm_manga_cmd(client, message):
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/manga <name>`")
-    await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "manga")
+    await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "manga", is_callback=False)
     message.stop_propagation()
 
 @Bot.on_message(filters.command("search") & filters.private, group=-1)
 async def admin_pm_search(client, message):
     if not await is_admin(message.from_user.id): return 
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/search <name>`")
-    await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "ALL")
+    await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "ALL", is_callback=False)
     message.stop_propagation()
 
 @Bot.on_message(filters.text & filters.private & ~filters.regex(r"^/"), group=-1)
 async def normal_user_auto_search(client, message):
     if await is_admin(message.from_user.id): return
     if len(message.text.strip()) < 2: return
-    await perform_search_list(client, message, message.text.strip(), "ALL")
+    await perform_search_list(client, message, message.text.strip(), "ALL", is_callback=False)
     message.stop_propagation()
 
 # --- CALLBACK ROUTER FOR DETAILS ---
+@Bot.on_callback_query(filters.regex(r"^typ_(anime|manga)_(.*)$"), group=-1)
+async def type_selected_cb(client, query):
+    req_type = query.matches[0].group(1)
+    search_query = query.matches[0].group(2)
+    await query.answer("Searching Database... ⏳")
+    await perform_search_list(client, query.message, search_query, req_type, is_callback=True)
+
 @Bot.on_callback_query(filters.regex(r"^show_ch_(-?\d+)_(.*)$"), group=-1)
 async def show_channel_details(client, query):
     try:
