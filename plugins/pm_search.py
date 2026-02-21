@@ -1,42 +1,76 @@
+
 import random
 import asyncio
+import re
+import aiohttp
 from datetime import datetime, timedelta
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from bot import Bot
 from database.database import kingdb
 from config import OWNER_ID, PICS  
-from .anilist import AniLister 
 
 async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
     return user_id == OWNER_ID or user_id in admins
 
-async def fetch_anilist_data(query, req_type):
-    try:
-        anilister = AniLister(query, datetime.now().year, req_type.upper())
-        return await anilister.get_anidata()
-    except Exception: return {}
+# ✈️ TITLE CLEANER: Sirf Anilist search ke liye naam saaf karega
+def clean_title_for_anilist(title):
+    title = re.sub(r'\[.*?\]|\(.*?\)', '', title) 
+    title = re.sub(r'(?i)(hindi|dubbed|dub|subbed|sub|dual|audio|multi|1080p|720p|480p|hevc|x264|x265|blu-ray|bluray|web-dl|webrip|season\s*\d+|s\d+)', '', title)
+    title = title.split('|')[0].split('-')[0]
+    return title.strip()
 
-# --- CATEGORY SELECTION ---
-async def ask_search_type(client, message, query):
-    buttons = [
-        [InlineKeyboardButton("🎬 Search Anime", callback_data=f"typ_anime_{query[:30]}"),
-         InlineKeyboardButton("📖 Search Manga/Manhwa", callback_data=f"typ_manga_{query[:30]}")]
-    ]
-    caption = f"🔍 **Search Request:** `{query}`\n\n👇 **What are you looking for? Select a category:**"
-    await message.reply_photo(photo=random.choice(PICS), caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
+# ✈️ SUPER FAST ANILIST FETCHER
+async def fast_anilist_fetch(query, req_type="ALL"):
+    variables = {'search': query}
+    
+    if req_type in ["anime", "manga"]:
+        variables["type"] = req_type.upper()
+        graphql = """
+        query ($search: String, $type: MediaType) {
+          Media (search: $search, type: $type) {
+            id title { english romaji } type format status episodes chapters seasonYear genres description(asHtml: false)
+          }
+        }
+        """
+    else:
+        graphql = """
+        query ($search: String) {
+          Media (search: $search) {
+            id title { english romaji } type format status episodes chapters seasonYear genres description(asHtml: false)
+          }
+        }
+        """
 
-# --- GENERATE LIST FROM DB ---
-async def perform_search_list(client, message, query, req_type):
-    results = await kingdb.search_channels(query)
-    filtered = [ch for ch in results if ch.get("ani_type", "anime").lower() == req_type.lower()]
+    async with aiohttp.ClientSession() as sess:
+        try:
+            async with sess.post("https://graphql.anilist.co", json={'query': graphql, 'variables': variables}, timeout=3) as resp:
+                data = await resp.json()
+                return data.get('data', {}).get('Media') or {}
+        except Exception:
+            return {}
+
+# --- FAST SEARCH & CHANNEL LIST GENERATOR ---
+async def perform_search_list(client, message, query, req_type="ALL"):
+    safe_query = re.sub(r'[*?+^$[\](){}|\\.]', '', query).strip()
+    results = await kingdb.search_channels(safe_query)
+    
+    if req_type != "ALL":
+        filtered = [ch for ch in results if ch.get("ani_type", "anime").lower() == req_type.lower()]
+    else:
+        filtered = results
 
     if not filtered:
-        return await message.reply(f"❌ **No {req_type.capitalize()} Results Found For:** `{query}`")
+        return await message.reply(f"❌ **No Results Found For:** `{query}`")
 
-    buttons = [[InlineKeyboardButton(ch.get("title", "Unknown"), callback_data=f"show_ch_{ch['_id']}_{req_type}")] for ch in filtered[:10]]
-    caption = f"🔍 **{req_type.capitalize()} Search results for:** `{query}`\n\n👇 **Please select an option below:**"
+    buttons = []
+    # Seedha channels ki list banegi jaisa pehle tha
+    for ch in filtered[:10]:
+        title = ch.get("title", "Unknown")
+        buttons.append([InlineKeyboardButton(title, callback_data=f"show_ch_{ch['_id']}_{req_type}")])
+
+    caption = f"🔍 **Search results for:** `{query}`\n\n👇 **Please select a channel below:**"
     
     if hasattr(message, "edit_media"):
         await message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=caption), reply_markup=InlineKeyboardMarkup(buttons))
@@ -60,56 +94,52 @@ async def pm_manga_cmd(client, message):
 async def admin_pm_search(client, message):
     if not await is_admin(message.from_user.id): return 
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/search <name>`")
-    await ask_search_type(client, message, message.text.split(" ", 1)[1].strip())
+    await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "ALL")
     message.stop_propagation()
 
 @Bot.on_message(filters.text & filters.private & ~filters.regex(r"^/"), group=-1)
 async def normal_user_auto_search(client, message):
     if await is_admin(message.from_user.id): return
     if len(message.text.strip()) < 2: return
-    await ask_search_type(client, message, message.text.strip())
+    await perform_search_list(client, message, message.text.strip(), "ALL")
     message.stop_propagation()
 
-# --- CALLBACK ROUTERS ---
-@Bot.on_callback_query(filters.regex(r"^typ_(anime|manga)_(.*)$"), group=-1)
-async def type_selected_cb(client, query):
-    req_type = query.matches[0].group(1)
-    search_query = query.matches[0].group(2)
-    await query.answer("Searching Database... ⏳")
-    await perform_search_list(client, query.message, search_query, req_type)
-
-@Bot.on_callback_query(filters.regex(r"^show_ch_(-?\d+)_(anime|manga)$"), group=-1)
+# --- CALLBACK ROUTER FOR DETAILS ---
+@Bot.on_callback_query(filters.regex(r"^show_ch_(-?\d+)_(.*)$"), group=-1)
 async def show_channel_details(client, query):
     try:
         ch_id = int(query.matches[0].group(1))
         req_type = query.matches[0].group(2)
-        ch = await kingdb.get_channel(ch_id)
         
+        ch = await kingdb.get_channel(ch_id)
         if not ch: return await query.answer("❌ This channel is no longer available.", show_alert=True)
             
         await query.answer("Fetching details... ⏳")
-        title = ch.get("title", "Unknown")
-        clean_title = title.split("|")[0].replace("Dual Audio", "").strip() 
+        raw_title = ch.get("title", "Unknown")
         
-        ani_data = await fetch_anilist_data(clean_title, req_type)
+        # ✈️ Sirf Anilist fetch karne ke liye naam clean kiya
+        clean_title = clean_title_for_anilist(raw_title)
+        ani_data = await fast_anilist_fetch(clean_title, req_type)
         
+        # Ek hi channel ka link generate hoga
+        join_mode = ch.get("join_mode", "direct")
         expire_seconds = ch.get("expire_seconds", 0)
         expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
 
-        if ch.get("join_mode", "direct") == "request":
+        if join_mode == "request": 
             link = await client.create_chat_invite_link(ch_id, creates_join_request=True, expire_date=expire_date)
-        else:
+        else: 
             link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
-        btn = [[InlineKeyboardButton(f"🎬 Access: {title[:20]}...", url=link.invite_link)]]
+        btn = [[InlineKeyboardButton(f"🎬 Access: {raw_title[:25]}", url=link.invite_link)]]
 
         if ani_data:
-            ani_title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or title
+            ani_title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or clean_title
             ani_format = ani_data.get('format', 'Unknown')
             status = ani_data.get('status', 'Unknown')
             year = ani_data.get('seasonYear', 'N/A')
             genres = ", ".join(ani_data.get('genres', [])[:3]) if ani_data.get('genres') else "N/A"
-            eps_chaps = f"✦ **Chapters:** {ani_data.get('chapters', 'N/A')}" if req_type == "manga" else f"✦ **Episodes:** {ani_data.get('episodes', 'N/A')}"
+            eps_chaps = f"✦ **Chapters:** {ani_data.get('chapters', 'N/A')}" if ani_data.get('type') == "MANGA" else f"✦ **Episodes:** {ani_data.get('episodes', 'N/A')}"
 
             synopsis = str(ani_data.get('description', 'No synopsis available.')).replace("<br>", "").replace("<i>", "").replace("</i>", "")
             if len(synopsis) > 200: synopsis = synopsis[:200] + "..."
@@ -123,12 +153,13 @@ async def show_channel_details(client, query):
                 f"{eps_chaps}   |   **Year:** {year}\n"
                 f"✦ **Genres:** {genres}\n"
                 f"✦ **Synopsis:** {synopsis}\n\n"
-                "👇 **Click the button below to access your files:**"
+                "👇 **Please click the button below to access your files:**"
             )
         else:
             poster = random.choice(PICS)
-            caption = f"<blockquote>**{title}**</blockquote>\n\n✦ **Status:** Found in Database ✅\n\n👇 **Click the button below to access your files:**"
+            caption = f"<blockquote>**{raw_title}**</blockquote>\n\n✦ **Status:** Found in Database ✅\n\n👇 **Please click the button below to access your files:**"
 
         await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
     except Exception as e:
+        print(f"Error in Callback: {e}")
         await query.answer("An error occurred.", show_alert=True)
