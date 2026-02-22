@@ -13,7 +13,14 @@ from plugins.FORMATS import FORCE_MSG
 
 AUTO_DELETE_TIME = 300 
 
-async def check_fsub_group_warn(client, message, user_id, is_callback=False):
+def is_exact_match(query, title):
+    if not title: return False
+    q = query.replace(" ", "").lower()
+    t = title.replace(" ", "").lower()
+    if len(query) >= 20 and t.startswith(q): return True 
+    return q == t
+
+async def check_fsub_group_warn(client, message, user_id, is_callback=False, query="", req_type="ALL"):
     if not user_id: return True 
     admins = await kingdb.get_all_admins()
     if user_id == OWNER_ID or user_id in admins: return True 
@@ -42,15 +49,18 @@ async def check_fsub_group_warn(client, message, user_id, is_callback=False):
             except: pass
 
     if count > 0:
-        try: buttons.append([InlineKeyboardButton(text='♻️ Tʀʏ Aɢᴀɪɴ', url=f"https://t.me/{client.username}")])
-        except: pass
+        if query:
+            buttons.append([InlineKeyboardButton(text='♻️ Tʀʏ Aɢᴀɪɴ', callback_data=f"grp_try_{req_type}_{query[:20]}")])
+        else:
+            try: buttons.append([InlineKeyboardButton(text='♻️ Tʀʏ Aɢᴀɪɴ', url=f"https://t.me/{client.username}")])
+            except: pass
+            
         caption = FORCE_MSG.format(
-            first=message.from_user.first_name,
-            last=message.from_user.last_name,
-            username=None if not message.from_user.username else '@' + message.from_user.username,
-            mention=message.from_user.mention,
-            id=message.from_user.id,
-            count=count, total=total
+            first=message.from_user.first_name if message.from_user else "User",
+            last=message.from_user.last_name if message.from_user else "",
+            username=None if not (message.from_user and message.from_user.username) else '@' + message.from_user.username,
+            mention=message.from_user.mention if message.from_user else "User",
+            id=user_id, count=count, total=total
         )
         if is_callback: await message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=caption), reply_markup=InlineKeyboardMarkup(buttons))
         else:
@@ -89,17 +99,32 @@ async def fast_anilist_fetch_by_id(ani_id):
                 return data.get('data', {}).get('Media') or {}
         except Exception: return {}
 
-async def perform_search_list_group(client, message, query, req_type="ALL", is_callback=False):
-    user_id = message.from_user.id if message.from_user else None
-    if not await check_fsub_group_warn(client, message, user_id, is_callback): return
-
+async def perform_search_list_group(client, message, query, req_type="ALL", is_callback=False, is_auto=False, cb_user_id=None):
+    user_id = cb_user_id or (message.from_user.id if message.from_user else None)
     safe_query = re.sub(r'[*?+^$[\](){}|\\.]', '', query).strip()
+    
+    if not await check_fsub_group_warn(client, message, user_id, is_callback, safe_query, req_type): return
+
     db_results = await kingdb.search_channels(safe_query)
     if req_type != "ALL": db_results = [ch for ch in db_results if ch.get("ani_type", "anime").lower() == req_type.lower()]
     ani_results = await fast_anilist_search(safe_query, req_type)
 
+    exact_db = []
+    for ch in db_results:
+        clean = clean_title_for_anilist(ch.get("title", ""))
+        if is_exact_match(safe_query, clean): exact_db.append(ch)
+    db_results = exact_db
+
+    exact_ani = []
+    for media in ani_results:
+        eng = media.get('title', {}).get('english') or ""
+        rom = media.get('title', {}).get('romaji') or ""
+        if is_exact_match(safe_query, eng) or is_exact_match(safe_query, rom): exact_ani.append(media)
+    ani_results = exact_ani
+
     if not db_results and not ani_results:
-        msg = await message.reply(f"❌ **No Results Found For:** `{query}`")
+        if is_auto: return 
+        msg = await message.reply(f"❌ **No Exact Results Found For:** `{query}`")
         if not is_callback:
             await asyncio.sleep(10)
             try: await msg.delete()
@@ -108,7 +133,7 @@ async def perform_search_list_group(client, message, query, req_type="ALL", is_c
 
     buttons = []
     added_titles = set()
-    short_query = safe_query[:10]
+    short_query = safe_query[:20]
 
     for ch in db_results[:5]:
         title = ch.get("title", "Unknown")
@@ -140,19 +165,28 @@ async def group_search_handler(client, message):
     if not await kingdb.is_group_approved(chat_id): return
     mode = await kingdb.get_search_mode(chat_id)
     
-    if text.lower().startswith("/anime "): return await perform_search_list_group(client, message, text.replace("/anime ", "", 1).strip(), "anime", False)
-    if text.lower().startswith("/manga "): return await perform_search_list_group(client, message, text.replace("/manga ", "", 1).strip(), "manga", False)
+    if text.lower().startswith("/anime "): return await perform_search_list_group(client, message, text.replace("/anime ", "", 1).strip(), "anime", False, False)
+    if text.lower().startswith("/manga "): return await perform_search_list_group(client, message, text.replace("/manga ", "", 1).strip(), "manga", False, False)
 
     query = ""
+    is_auto = False
     if mode == "command":
         if text.lower().startswith("/search "): query = text.replace("/search ", "", 1).strip()
         else: return 
     elif mode == "auto":
         if text.startswith("/"): return 
         query = text
+        is_auto = True
     
     if len(query) < 2: return 
-    await perform_search_list_group(client, message, query, "ALL", False)
+    await perform_search_list_group(client, message, query, "ALL", False, is_auto)
+
+# ✈️ SMART TRY AGAIN HANDLER FOR GROUP
+@Bot.on_callback_query(filters.regex(r"^grp_try_(.*)_(.*)$"), group=-1)
+async def grp_try_again_cb(client, query):
+    req_type = query.matches[0].group(1)
+    sq = query.matches[0].group(2)
+    await perform_search_list_group(client, query.message, sq, req_type, True, False, query.from_user.id)
 
 def build_details_caption_group(ani_data, clean_title):
     if ani_data:
@@ -178,8 +212,8 @@ def build_details_caption_group(ani_data, clean_title):
 
 @Bot.on_callback_query(filters.regex(r"^grp_dbch_(-?\d+)_(.*)_(.*)$"), group=-1)
 async def grp_dbch_details(client, query):
-    if not await check_fsub_group_warn(client, query.message, query.from_user.id, True): return
     ch_id, req_type, sq = int(query.matches[0].group(1)), query.matches[0].group(2), query.matches[0].group(3)
+    if not await check_fsub_group_warn(client, query.message, query.from_user.id, True, sq, req_type): return
     
     ch = await kingdb.get_channel(ch_id)
     if not ch: return await query.answer("❌ Not available.", show_alert=True)
@@ -188,14 +222,11 @@ async def grp_dbch_details(client, query):
     raw_title = ch.get("title", "Unknown")
     clean_title = clean_title_for_anilist(raw_title)
     
-    # ✈️ FIXED FULL DETAILS FETCH
     ani_data = None
-    if ch.get("ani_id"):
-        ani_data = await fast_anilist_fetch_by_id(ch.get("ani_id"))
+    if ch.get("ani_id"): ani_data = await fast_anilist_fetch_by_id(ch.get("ani_id"))
     if not ani_data: 
         search_results = await fast_anilist_search(clean_title, req_type)
-        if search_results and 'id' in search_results[0]:
-            ani_data = await fast_anilist_fetch_by_id(search_results[0]['id']) 
+        if search_results and 'id' in search_results[0]: ani_data = await fast_anilist_fetch_by_id(search_results[0]['id']) 
         else: ani_data = {}
 
     join_mode, expire_seconds = ch.get("join_mode", "direct"), ch.get("expire_seconds", 0)
@@ -213,8 +244,8 @@ async def grp_dbch_details(client, query):
 
 @Bot.on_callback_query(filters.regex(r"^grp_aclk_(\d+)_(.*)_(.*)$"), group=-1)
 async def grp_aclk_details(client, query):
-    if not await check_fsub_group_warn(client, query.message, query.from_user.id, True): return
     ani_id, req_type, sq = int(query.matches[0].group(1)), query.matches[0].group(2), query.matches[0].group(3)
+    if not await check_fsub_group_warn(client, query.message, query.from_user.id, True, sq, req_type): return
     await query.answer("Fetching Details... ⏳")
     
     ani_data = await fast_anilist_fetch_by_id(ani_id)
@@ -256,7 +287,7 @@ async def grp_request_upload(client, query):
 @Bot.on_callback_query(filters.regex(r"^grp_bck_(.*)$"), group=-1)
 async def grp_back_to_search(client, query):
     sq = query.matches[0].group(1)
-    await perform_search_list_group(client, query.message, sq, "ALL", is_callback=True)
+    await perform_search_list_group(client, query.message, sq, "ALL", is_callback=True, cb_user_id=query.from_user.id)
 
 @Bot.on_callback_query(filters.regex(r"^grp_close_panel$"), group=-1)
 async def grp_close_panel_cb(client, query):
