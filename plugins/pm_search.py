@@ -9,7 +9,7 @@ from bot import Bot
 from database.database import kingdb
 from config import OWNER_ID, PICS, LOG_CHANNEL  
 from helper_func import is_userJoin
-from plugins.FORMATS import FORCE_MSG # ✈️ Tera asli start wala format
+from plugins.FORMATS import FORCE_MSG 
 
 async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
@@ -42,7 +42,8 @@ async def check_fsub_and_warn(client, message, user_id, is_callback=False):
 
                 buttons.append([InlineKeyboardButton(text=cname, url=link)])
                 count += 1
-            except Exception as e: print(f"Search FSub Error: {e}")
+            except Exception as e:
+                print(f"Search FSub Error: {e}")
 
     if count > 0:
         try: buttons.append([InlineKeyboardButton(text='♻️ Tʀʏ Aɢᴀɪɴ', url=f"https://t.me/{client.username}")])
@@ -121,9 +122,8 @@ async def perform_search_list(client, message, query, req_type="ALL", is_callbac
 
     buttons = []
     added_titles = set()
-    short_query = safe_query[:10] # For back button storage
+    short_query = safe_query[:10] 
 
-    # 1. Add DB Results First
     for ch in db_results[:5]:
         title = ch.get("title", "Unknown")
         clean = clean_title_for_anilist(title)
@@ -131,7 +131,6 @@ async def perform_search_list(client, message, query, req_type="ALL", is_callbac
             added_titles.add(clean.lower())
             buttons.append([InlineKeyboardButton(clean[:30], callback_data=f"dbch_{ch['_id']}_{req_type}_{short_query}")])
 
-    # 2. Add Anilist Results (For Request System)
     for media in ani_results:
         title = media.get('title', {}).get('english') or media.get('title', {}).get('romaji') or "Unknown"
         if title.lower() not in added_titles:
@@ -167,7 +166,6 @@ async def normal_user_auto_search(client, message):
     if len(message.text.strip()) < 2: return
     await perform_search_list(client, message, message.text.strip(), "ALL", False)
 
-
 # ================= ✈️ CALLBACK ROUTERS =================
 
 def build_details_caption(ani_data, clean_title):
@@ -193,7 +191,6 @@ def build_details_caption(ani_data, clean_title):
     else:
         return random.choice(PICS), f"<blockquote>**{clean_title}**</blockquote>\n\n✦ **Status:** Found in Database ✅\n\n"
 
-# 1. DB CHANNELS CLICK (Already indexed)
 @Bot.on_callback_query(filters.regex(r"^dbch_(-?\d+)_(.*)_(.*)$"), group=-1)
 async def dbch_details(client, query):
     if not await check_fsub_and_warn(client, query.message, query.from_user.id, True): return
@@ -201,12 +198,20 @@ async def dbch_details(client, query):
     
     ch = await kingdb.get_channel(ch_id)
     if not ch: return await query.answer("❌ Not available.", show_alert=True)
-    await query.answer("Fetching... ⏳")
+    await query.answer("Fetching Details... ⏳")
         
     raw_title = ch.get("title", "Unknown")
     clean_title = clean_title_for_anilist(raw_title)
-    ani_data = await fast_anilist_fetch_by_id(ch.get("ani_id")) if ch.get("ani_id") else None # Try direct first
-    if not ani_data: ani_data = (await fast_anilist_search(clean_title, req_type))[0] if await fast_anilist_search(clean_title, req_type) else {}
+    
+    # ✈️ FIXED FULL DETAILS FETCH
+    ani_data = None
+    if ch.get("ani_id"):
+        ani_data = await fast_anilist_fetch_by_id(ch.get("ani_id"))
+    if not ani_data: 
+        search_results = await fast_anilist_search(clean_title, req_type)
+        if search_results and 'id' in search_results[0]:
+            ani_data = await fast_anilist_fetch_by_id(search_results[0]['id']) 
+        else: ani_data = {}
 
     join_mode, expire_seconds = ch.get("join_mode", "direct"), ch.get("expire_seconds", 0)
     expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
@@ -214,23 +219,22 @@ async def dbch_details(client, query):
     else: link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
     poster, caption = build_details_caption(ani_data, clean_title)
+    caption += "👇 **Please click the button below to access your files:**"
     btn = [
         [InlineKeyboardButton(f"🎬 Access: {clean_title[:15]}", url=link.invite_link)],
         [InlineKeyboardButton("🔙 Back", callback_data=f"bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="close_panel")]
     ]
     await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
 
-# 2. ANILIST CLICK (Check DB, if not found -> Request)
 @Bot.on_callback_query(filters.regex(r"^aclk_(\d+)_(.*)_(.*)$"), group=-1)
 async def aclk_details(client, query):
     if not await check_fsub_and_warn(client, query.message, query.from_user.id, True): return
     ani_id, req_type, sq = int(query.matches[0].group(1)), query.matches[0].group(2), query.matches[0].group(3)
-    await query.answer("Fetching... ⏳")
+    await query.answer("Fetching Details... ⏳")
     
     ani_data = await fast_anilist_fetch_by_id(ani_id)
     title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or "Unknown"
     
-    # DB me search maaro
     db_results = await kingdb.search_channels(title)
     if not db_results and ani_data.get('title', {}).get('romaji'):
         db_results = await kingdb.search_channels(ani_data.get('title', {}).get('romaji'))
@@ -244,16 +248,15 @@ async def aclk_details(client, query):
         expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
         if join_mode == "request": link = await client.create_chat_invite_link(ch['_id'], creates_join_request=True, expire_date=expire_date)
         else: link = await client.create_chat_invite_link(ch['_id'], expire_date=expire_date)
+        caption += "👇 **Please click the button below to access your files:**"
         btn.append([InlineKeyboardButton(f"🎬 Access: {title[:15]}", url=link.invite_link)])
     else:
-        # Not in DB -> Show Request Button!
         caption += "⚠️ **Status:** __Not available in Database.__\n👇 Click the button below to request an upload!"
         btn.append([InlineKeyboardButton("📥 Request Upload", callback_data=f"req_{ani_id}")])
 
     btn.append([InlineKeyboardButton("🔙 Back", callback_data=f"bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="close_panel")])
     await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
 
-# 3. REQUEST BUTTON HANDLER
 @Bot.on_callback_query(filters.regex(r"^req_(\d+)$"), group=-1)
 async def request_upload(client, query):
     ani_id = int(query.matches[0].group(1))
@@ -266,7 +269,6 @@ async def request_upload(client, query):
     )
     await query.answer("✅ Request Sent to Admins! Hum jaldi upload karenge.", show_alert=True)
 
-# 4. BACK & CLOSE HANDLERS
 @Bot.on_callback_query(filters.regex(r"^bck_(.*)$"), group=-1)
 async def back_to_search(client, query):
     sq = query.matches[0].group(1)
