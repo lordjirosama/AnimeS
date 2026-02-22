@@ -9,7 +9,7 @@ from bot import Bot
 from database.database import kingdb
 from config import OWNER_ID, PICS, LOG_CHANNEL  
 from helper_func import is_userJoin
-from plugins.FORMATS import FORCE_MSG # ✈️ Tera asli start wala format
+from plugins.FORMATS import FORCE_MSG # ✈️ 
 
 async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
