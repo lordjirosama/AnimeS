@@ -77,15 +77,20 @@ async def index_callbacks(client, query):
 
     data = query.data
 
-    # --- PANEL NAVIGATION ---
+    # --- PANEL NAVIGATION (MessageNotModified Error Fixed Here) ---
     if data == "idx_refresh" or data == "idx_back":
         text, markup = get_index_panel_ui()
-        try: await query.message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=text), reply_markup=markup)
-        except: await query.answer("Refreshed! 🔄")
+        try: 
+            await query.message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=text), reply_markup=markup)
+        except Exception: 
+            await query.answer("Already updated! 🔄")
 
     elif data == "idx_list":
         text, markup = get_index_list_ui()
-        await query.message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=text), reply_markup=markup)
+        try:
+            await query.message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=text), reply_markup=markup)
+        except Exception:
+            pass
 
     # --- ADD INDEX ---
     elif data == "idx_add":
@@ -105,7 +110,7 @@ async def index_callbacks(client, query):
             )
             ch_id = int(ask.text.strip())
             
-            # ✈️ YAHAN DB UPDATE KIYA HAI (del_indexed_channel)
+            # DB function is updated to del_indexed_channel
             await kingdb.del_indexed_channel(ch_id) 
             blacklisted_chats.add(ch_id) 
 
@@ -141,7 +146,10 @@ async def index_callbacks(client, query):
             msg_text = msg_text[:950] + "\n\n_...and more (List truncated)._"
             
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to List", callback_data="idx_list")]])
-        await query.message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=msg_text), reply_markup=markup)
+        try:
+            await query.message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=msg_text), reply_markup=markup)
+        except Exception:
+            pass
 
     # --- REINDEX ALL COMMAND ---
     elif data == "idx_reindex":
@@ -181,7 +189,6 @@ async def index_callbacks(client, query):
     elif data.startswith("log_remove_"):
         chat_id = int(data.split("_")[2])
         
-        # ✈️ YAHAN DB UPDATE KIYA HAI
         await kingdb.del_indexed_channel(chat_id)
         
         blacklisted_chats.add(chat_id)
@@ -252,12 +259,10 @@ async def index_forward(client, message):
 # ================= 4. AUTO ADD ON BOT JOIN ================= #
 @Bot.on_chat_member_updated()
 async def auto_index_on_add(client, event: ChatMemberUpdated):
-    # ✈️ YAHAN BOT DETECTION LOGIC KO SHARP KIYA HAI
     is_bot_added = False
     
     # Check if the member being updated is the bot itself
     if event.new_chat_member and event.new_chat_member.user.is_self:
-        # Check if bot was added as a member or promoted to admin
         if event.new_chat_member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.ADMINISTRATOR]:
             is_bot_added = True
 
