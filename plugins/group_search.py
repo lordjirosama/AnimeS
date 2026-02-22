@@ -183,12 +183,20 @@ async def grp_dbch_details(client, query):
     
     ch = await kingdb.get_channel(ch_id)
     if not ch: return await query.answer("❌ Not available.", show_alert=True)
-    await query.answer("Fetching... ⏳")
+    await query.answer("Fetching Details... ⏳")
         
     raw_title = ch.get("title", "Unknown")
     clean_title = clean_title_for_anilist(raw_title)
-    ani_data = await fast_anilist_fetch_by_id(ch.get("ani_id")) if ch.get("ani_id") else None 
-    if not ani_data: ani_data = (await fast_anilist_search(clean_title, req_type))[0] if await fast_anilist_search(clean_title, req_type) else {}
+    
+    # ✈️ FIXED FULL DETAILS FETCH
+    ani_data = None
+    if ch.get("ani_id"):
+        ani_data = await fast_anilist_fetch_by_id(ch.get("ani_id"))
+    if not ani_data: 
+        search_results = await fast_anilist_search(clean_title, req_type)
+        if search_results and 'id' in search_results[0]:
+            ani_data = await fast_anilist_fetch_by_id(search_results[0]['id']) 
+        else: ani_data = {}
 
     join_mode, expire_seconds = ch.get("join_mode", "direct"), ch.get("expire_seconds", 0)
     expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
@@ -196,6 +204,7 @@ async def grp_dbch_details(client, query):
     else: link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
     poster, caption = build_details_caption_group(ani_data, clean_title)
+    caption += "👇 **Please click the button below to access your files:**\n⏳ _This message will be deleted shortly._"
     btn = [
         [InlineKeyboardButton(f"🎬 Access: {clean_title[:15]}", url=link.invite_link)],
         [InlineKeyboardButton("🔙 Back", callback_data=f"grp_bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="grp_close_panel")]
@@ -206,7 +215,7 @@ async def grp_dbch_details(client, query):
 async def grp_aclk_details(client, query):
     if not await check_fsub_group_warn(client, query.message, query.from_user.id, True): return
     ani_id, req_type, sq = int(query.matches[0].group(1)), query.matches[0].group(2), query.matches[0].group(3)
-    await query.answer("Fetching... ⏳")
+    await query.answer("Fetching Details... ⏳")
     
     ani_data = await fast_anilist_fetch_by_id(ani_id)
     title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or "Unknown"
@@ -223,9 +232,10 @@ async def grp_aclk_details(client, query):
         expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
         if join_mode == "request": link = await client.create_chat_invite_link(ch['_id'], creates_join_request=True, expire_date=expire_date)
         else: link = await client.create_chat_invite_link(ch['_id'], expire_date=expire_date)
+        caption += "👇 **Please click the button below to access your files:**\n⏳ _This message will be deleted shortly._"
         btn.append([InlineKeyboardButton(f"🎬 Access: {title[:15]}", url=link.invite_link)])
     else:
-        caption += "⚠️ **Status:** __Not available in Database.__\n👇 Click the button below to request an upload!"
+        caption += "⚠️ **Status:** __Not available in Database.__\n👇 Click the button below to request an upload!\n⏳ _This message will be deleted shortly._"
         btn.append([InlineKeyboardButton("📥 Request Upload", callback_data=f"grp_req_{ani_id}")])
 
     btn.append([InlineKeyboardButton("🔙 Back", callback_data=f"grp_bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="grp_close_panel")])
