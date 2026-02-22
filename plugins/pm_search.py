@@ -8,6 +8,18 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMedi
 from bot import Bot
 from database.database import kingdb
 from config import OWNER_ID, PICS  
+from helper_func import is_userJoin
+
+# Custom Filter to Check if user was joined or not 
+async def fsub_check(_, __, message):
+    user_id = message.from_user.id
+    #will check all the fsub chnl
+    for chat_id in await kingdb.get_all_channels():
+        if not await is_userJoin(client, user_id, chat_id):
+            return False # User hasn't joined
+    return True # User joined all
+
+fsub_filter = filters.create(fsub_check)
 
 async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
@@ -82,20 +94,20 @@ async def perform_search_list(client, message, query, req_type="ALL", is_callbac
     else:
         await message.reply_photo(photo=random.choice(PICS), caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
 
-# --- COMMANDS (FOR ADMINS & SPECIFIC QUERIES) ---
-@Bot.on_message(filters.command("anime") & filters.private & ~filters.bot, group=-1)
+# --- COMMANDS (WITH FSUB FILTER) ---
+@Bot.on_message(filters.command("anime") & filters.private & ~filters.bot & fsub_filter, group=-1)
 async def pm_anime_cmd(client, message):
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/anime <name>`")
     await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "anime", is_callback=False)
     message.stop_propagation()
 
-@Bot.on_message(filters.command("manga") & filters.private & ~filters.bot, group=-1)
+@Bot.on_message(filters.command("manga") & filters.private & ~filters.bot & fsub_filter, group=-1)
 async def pm_manga_cmd(client, message):
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/manga <name>`")
     await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "manga", is_callback=False)
     message.stop_propagation()
 
-@Bot.on_message(filters.command("search") & filters.private & ~filters.bot, group=-1)
+@Bot.on_message(filters.command("search") & filters.private & ~filters.bot & fsub_filter, group=-1)
 async def admin_pm_search(client, message):
     if not await is_admin(message.from_user.id): return 
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/search <name>`")
@@ -139,7 +151,7 @@ async def show_channel_details(client, query):
             link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
         # Access button par bhi clean name dikhayega
-        btn = [[InlineKeyboardButton(f"🎬 Access: {clean_title[:25]}", url=link.invite_link)]]
+        btn = [[InlineKeyboardButton(f"{clean_title[:25]}", url=link.invite_link)]]
 
         if ani_data:
             ani_title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or clean_title
