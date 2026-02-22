@@ -7,7 +7,30 @@ from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from bot import Bot
 from database.database import kingdb
-from config import PICS  
+from helper_func import is_userJoin
+from config import OWNER_ID, PICS
+
+# --- CUSTOM FSUB FILTER FOR GROUPS ---
+async def fsub_check_group(_, client, message):
+    # Agar koi Anonymous Admin ya Channel ban kar message kare
+    if not message.from_user:
+        return True 
+        
+    user_id = message.from_user.id
+    
+    # Admins Bypass
+    admins = await kingdb.get_all_admins()
+    if user_id == OWNER_ID or user_id in admins:
+        return True
+        
+    # Database se FSub channels check karega
+    for chat_id in await kingdb.get_all_channels():
+        if not await is_userJoin(client, user_id, chat_id):
+            return False # Agar ek me bhi join nahi hai, toh rok dega
+            
+    return True
+
+grp_fsub_filter = filters.create(fsub_check_group)
 
 AUTO_DELETE_TIME = 300 # 5 Minutes
 
@@ -86,7 +109,7 @@ async def perform_search_list_group(client, message, query, req_type="ALL", is_c
         except: pass
 
 # --- MAIN GROUP MESSAGE HANDLER ---
-@Bot.on_message(filters.text & filters.group & ~filters.bot, group=-1)
+@Bot.on_message(filters.text & filters.group & ~filters.bot & grp_fsub_filter, group=-1)
 async def group_search_handler(client, message):
     chat_id = message.chat.id
     text = message.text.strip()
@@ -165,6 +188,7 @@ async def group_show_channel_details(client, query):
                 f"⏳ _This message will be deleted shortly._"
             )
 
+        # Typo fixed here!
         await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
     except Exception as e:
         await query.answer("An error occurred.", show_alert=True)
