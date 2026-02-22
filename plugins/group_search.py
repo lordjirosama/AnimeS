@@ -12,21 +12,17 @@ from config import OWNER_ID, PICS
 
 # --- CUSTOM FSUB FILTER FOR GROUPS ---
 async def fsub_check_group(_, client, message):
-    # Agar koi Anonymous Admin ya Channel ban kar message kare
     if not message.from_user:
         return True 
         
     user_id = message.from_user.id
-    
-    # Admins Bypass
     admins = await kingdb.get_all_admins()
     if user_id == OWNER_ID or user_id in admins:
         return True
         
-    # Database se FSub channels check karega
     for chat_id in await kingdb.get_all_channels():
         if not await is_userJoin(client, user_id, chat_id):
-            return False # Agar ek me bhi join nahi hai, toh rok dega
+            return False 
             
     return True
 
@@ -89,7 +85,6 @@ async def perform_search_list_group(client, message, query, req_type="ALL", is_c
     buttons = []
     for ch in filtered[:10]:
         raw_title = ch.get("title", "Unknown")
-        # ✈️ Clean name on buttons
         clean_btn_name = clean_title_for_anilist(raw_title)
         btn_text = clean_btn_name if len(clean_btn_name) > 1 else raw_title[:25]
         buttons.append([InlineKeyboardButton(btn_text, callback_data=f"grp_show_ch_{ch['_id']}_{req_type}")])
@@ -188,7 +183,6 @@ async def group_show_channel_details(client, query):
                 f"⏳ _This message will be deleted shortly._"
             )
 
-        # Typo fixed here!
         await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
     except Exception as e:
         await query.answer("An error occurred.", show_alert=True)
