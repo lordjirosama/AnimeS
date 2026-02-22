@@ -19,7 +19,7 @@ API_HASH = os.environ.get("API_HASH", "4e81464b29d79c58d0ad8a0c55ece4a5")
 CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002465721727"))
 
 #OWNER ID --⚠️ REQUIRED--
-OWNER_ID = int(os.environ.get("OWNER_ID", "5200268300"))
+OWNER_ID = int(os.environ.get("OWNER_ID", "5585016974"))
 # Agar aisi line hai:
 # LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "-100123456789") 
 
