@@ -13,22 +13,23 @@ async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
     return user_id == OWNER_ID or user_id in admins
 
-# ✈️ TITLE CLEANER: Sirf Anilist search ke liye naam saaf karega
+# ✈️ TITLE CLEANER: Naam ko ekdum saaf karega Anilist aur Buttons ke liye
 def clean_title_for_anilist(title):
     title = re.sub(r'\[.*?\]|\(.*?\)', '', title) 
     title = re.sub(r'(?i)(hindi|dubbed|dub|subbed|sub|dual|audio|multi|1080p|720p|480p|hevc|x264|x265|blu-ray|bluray|web-dl|webrip|season\s*\d+|s\d+)', '', title)
     title = title.split('|')[0].split('-')[0]
-    return title.strip()
+    return title.strip().title()
 
-# ✈️ SUPER FAST ANILIST FETCHER
+# ✈️ SUPER FAST ANILIST FETCHER (Fixed One-Shot issue using Popularity Sort)
 async def fast_anilist_fetch(query, req_type="ALL"):
     variables = {'search': query}
     
+    # sort: POPULARITY_DESC se hamesha main/popular series aayegi, one-shot nahi.
     if req_type in ["anime", "manga"]:
         variables["type"] = req_type.upper()
         graphql = """
         query ($search: String, $type: MediaType) {
-          Media (search: $search, type: $type) {
+          Media (search: $search, type: $type, sort: POPULARITY_DESC) {
             id title { english romaji } type format status episodes chapters seasonYear genres description(asHtml: false)
           }
         }
@@ -36,7 +37,7 @@ async def fast_anilist_fetch(query, req_type="ALL"):
     else:
         graphql = """
         query ($search: String) {
-          Media (search: $search) {
+          Media (search: $search, sort: POPULARITY_DESC) {
             id title { english romaji } type format status episodes chapters seasonYear genres description(asHtml: false)
           }
         }
@@ -67,54 +68,52 @@ async def perform_search_list(client, message, query, req_type="ALL", is_callbac
             return await message.reply(f"❌ **No Results Found For:** `{query}`")
 
     buttons = []
-    # Seedha channels ki list banegi jaisa pehle tha
     for ch in filtered[:10]:
-        title = ch.get("title", "Unknown")
-        buttons.append([InlineKeyboardButton(title, callback_data=f"show_ch_{ch['_id']}_{req_type}")])
+        raw_title = ch.get("title", "Unknown")
+        # ✈️ Yahan Button ka naam clean kar diya gaya hai
+        clean_btn_name = clean_title_for_anilist(raw_title)
+        btn_text = clean_btn_name if len(clean_btn_name) > 1 else raw_title[:25]
+        buttons.append([InlineKeyboardButton(btn_text, callback_data=f"show_ch_{ch['_id']}_{req_type}")])
 
-    caption = f"🔍 **Search results for:** `{query}`\n\n👇 **Please select a channel below:**"
+    caption = f"🔍 **Search results for:** `{query}`\n\n👇 **Please select an option below:**"
     
-    # CRASH FIX: Properly checking is_callback flag
     if is_callback:
         await message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=caption), reply_markup=InlineKeyboardMarkup(buttons))
     else:
         await message.reply_photo(photo=random.choice(PICS), caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
 
-# --- COMMANDS ---
-@Bot.on_message(filters.command("anime") & filters.private, group=-1)
+# --- COMMANDS (FOR ADMINS & SPECIFIC QUERIES) ---
+@Bot.on_message(filters.command("anime") & filters.private & ~filters.bot, group=-1)
 async def pm_anime_cmd(client, message):
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/anime <name>`")
     await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "anime", is_callback=False)
     message.stop_propagation()
 
-@Bot.on_message(filters.command("manga") & filters.private, group=-1)
+@Bot.on_message(filters.command("manga") & filters.private & ~filters.bot, group=-1)
 async def pm_manga_cmd(client, message):
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/manga <name>`")
     await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "manga", is_callback=False)
     message.stop_propagation()
 
-@Bot.on_message(filters.command("search") & filters.private, group=-1)
+@Bot.on_message(filters.command("search") & filters.private & ~filters.bot, group=-1)
 async def admin_pm_search(client, message):
     if not await is_admin(message.from_user.id): return 
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/search <name>`")
     await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "ALL", is_callback=False)
     message.stop_propagation()
 
-@Bot.on_message(filters.text & filters.private & ~filters.regex(r"^/"), group=-1)
+# --- AUTO SEARCH (ONLY FOR NORMAL USERS) ---
+# Yahan ~filters.bot aur ~filters.me lagaya hai taki loop na bane
+@Bot.on_message(filters.text & filters.private & ~filters.regex(r"^/") & ~filters.bot & ~filters.me, group=-1)
 async def normal_user_auto_search(client, message):
+    # Agar admin hai, toh auto-search ignore marega, unko /search use karna padega
     if await is_admin(message.from_user.id): return
+    
     if len(message.text.strip()) < 2: return
     await perform_search_list(client, message, message.text.strip(), "ALL", is_callback=False)
     message.stop_propagation()
 
 # --- CALLBACK ROUTER FOR DETAILS ---
-@Bot.on_callback_query(filters.regex(r"^typ_(anime|manga)_(.*)$"), group=-1)
-async def type_selected_cb(client, query):
-    req_type = query.matches[0].group(1)
-    search_query = query.matches[0].group(2)
-    await query.answer("Searching Database... ⏳")
-    await perform_search_list(client, query.message, search_query, req_type, is_callback=True)
-
 @Bot.on_callback_query(filters.regex(r"^show_ch_(-?\d+)_(.*)$"), group=-1)
 async def show_channel_details(client, query):
     try:
@@ -127,11 +126,9 @@ async def show_channel_details(client, query):
         await query.answer("Fetching details... ⏳")
         raw_title = ch.get("title", "Unknown")
         
-        # ✈️ Sirf Anilist fetch karne ke liye naam clean kiya
         clean_title = clean_title_for_anilist(raw_title)
         ani_data = await fast_anilist_fetch(clean_title, req_type)
         
-        # Ek hi channel ka link generate hoga
         join_mode = ch.get("join_mode", "direct")
         expire_seconds = ch.get("expire_seconds", 0)
         expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
@@ -141,7 +138,8 @@ async def show_channel_details(client, query):
         else: 
             link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
-        btn = [[InlineKeyboardButton(f"🎬 Access: {raw_title[:25]}", url=link.invite_link)]]
+        # Access button par bhi clean name dikhayega
+        btn = [[InlineKeyboardButton(f"🎬 Access: {clean_title[:25]}", url=link.invite_link)]]
 
         if ani_data:
             ani_title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or clean_title
@@ -167,7 +165,7 @@ async def show_channel_details(client, query):
             )
         else:
             poster = random.choice(PICS)
-            caption = f"<blockquote>**{raw_title}**</blockquote>\n\n✦ **Status:** Found in Database ✅\n\n👇 **Please click the button below to access your files:**"
+            caption = f"<blockquote>**{clean_title}**</blockquote>\n\n✦ **Status:** Found in Database ✅\n\n👇 **Please click the button below to access your files:**"
 
         await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
     except Exception as e:
