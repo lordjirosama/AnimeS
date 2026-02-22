@@ -104,8 +104,10 @@ async def index_callbacks(client, query):
                 filters=filters.user(user_id)
             )
             ch_id = int(ask.text.strip())
-            await kingdb.del_channel(ch_id)
-            blacklisted_chats.add(ch_id) # Blacklist to prevent auto-index
+            
+            # ✈️ YAHAN DB UPDATE KIYA HAI (del_indexed_channel)
+            await kingdb.del_indexed_channel(ch_id) 
+            blacklisted_chats.add(ch_id) 
 
             text, markup = get_index_panel_ui()
             await ask.reply_photo(
@@ -134,7 +136,7 @@ async def index_callbacks(client, query):
             title = ch.get('title', 'Unknown')
             msg_text += f"▪️ **{title}** (`{ch['_id']}`)\n"
             
-        # Truncate if too long for caption (Telegram limit is 1024 chars)
+        # Truncate if too long
         if len(msg_text) > 1000:
             msg_text = msg_text[:950] + "\n\n_...and more (List truncated)._"
             
@@ -160,7 +162,6 @@ async def index_callbacks(client, query):
                     expire_seconds=ch.get("expire_seconds", 600),
                     added_by=ch.get("added_by", OWNER_ID)
                 )
-                # Ensure type remains the same
                 await kingdb.update_channel(chat.id, {"ani_type": ch.get("ani_type", "anime")})
                 success += 1
                 await asyncio.sleep(1) # Flood wait protection
@@ -179,14 +180,18 @@ async def index_callbacks(client, query):
     # --- LOG CHANNEL CALLBACKS ---
     elif data.startswith("log_remove_"):
         chat_id = int(data.split("_")[2])
-        await kingdb.del_channel(chat_id)
+        
+        # ✈️ YAHAN DB UPDATE KIYA HAI
+        await kingdb.del_indexed_channel(chat_id)
+        
         blacklisted_chats.add(chat_id)
         await query.message.edit_text(f"🗑 **Channel Removed Permanently:** `{chat_id}`")
         
     elif data.startswith("settype_"):
         parts = data.split("_")
-        new_type = parts[1] 
+        new_type = parts[1] # anime or manga
         chat_id = int(parts[2])
+        
         await kingdb.update_channel(chat_id, {"ani_type": new_type})
         await query.answer(f"✅ Category updated to {new_type.upper()}!", show_alert=True)
 
@@ -205,7 +210,6 @@ async def index_forward(client, message):
         return message.stop_propagation()
 
     try:
-        # Remove from blacklist if manually added
         if chat.id in blacklisted_chats:
             blacklisted_chats.remove(chat.id)
 
@@ -248,14 +252,23 @@ async def index_forward(client, message):
 # ================= 4. AUTO ADD ON BOT JOIN ================= #
 @Bot.on_chat_member_updated()
 async def auto_index_on_add(client, event: ChatMemberUpdated):
-    if not event.new_chat_member or event.new_chat_member.user.id != client.me.id:
+    # ✈️ YAHAN BOT DETECTION LOGIC KO SHARP KIYA HAI
+    is_bot_added = False
+    
+    # Check if the member being updated is the bot itself
+    if event.new_chat_member and event.new_chat_member.user.is_self:
+        # Check if bot was added as a member or promoted to admin
+        if event.new_chat_member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.ADMINISTRATOR]:
+            is_bot_added = True
+
+    if not is_bot_added:
         return
 
     chat = event.chat
     if chat.type not in [enums.ChatType.CHANNEL, enums.ChatType.SUPERGROUP]:
         return
 
-    # Check Blacklist - Skip auto indexing if it was removed earlier
+    # Check Blacklist
     if chat.id in blacklisted_chats:
         return
 
