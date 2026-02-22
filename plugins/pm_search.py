@@ -10,33 +10,31 @@ from database.database import kingdb
 from config import OWNER_ID, PICS  
 from helper_func import is_userJoin
 
-# Custom Filter to Check if user was joined or not 
-async def fsub_check(_, __, message):
-    user_id = message.from_user.id
-    #will check all the fsub chnl
-    for chat_id in await kingdb.get_all_channels():
-        if not await is_userJoin(client, user_id, chat_id):
-            return False # User hasn't joined
-    return True # User joined all
-
-fsub_filter = filters.create(fsub_check)
-
 async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
     return user_id == OWNER_ID or user_id in admins
 
-# ✈️ TITLE CLEANER: Naam ko ekdum saaf karega Anilist aur Buttons ke liye
+# --- CUSTOM FSUB FILTER ---
+async def fsub_check(_, client, message):
+    user_id = message.from_user.id
+    if await is_admin(user_id):
+        return True
+    for chat_id in await kingdb.get_all_channels():
+        if not await is_userJoin(client, user_id, chat_id):
+            return False 
+    return True 
+
+fsub_filter = filters.create(fsub_check)
+
 def clean_title_for_anilist(title):
     title = re.sub(r'\[.*?\]|\(.*?\)', '', title) 
     title = re.sub(r'(?i)(hindi|dubbed|dub|subbed|sub|dual|audio|multi|1080p|720p|480p|hevc|x264|x265|blu-ray|bluray|web-dl|webrip|season\s*\d+|s\d+)', '', title)
     title = title.split('|')[0].split('-')[0]
     return title.strip().title()
 
-# ✈️ SUPER FAST ANILIST FETCHER (Fixed One-Shot issue using Popularity Sort)
 async def fast_anilist_fetch(query, req_type="ALL"):
     variables = {'search': query}
     
-    # sort: POPULARITY_DESC se hamesha main/popular series aayegi, one-shot nahi.
     if req_type in ["anime", "manga"]:
         variables["type"] = req_type.upper()
         graphql = """
@@ -63,7 +61,6 @@ async def fast_anilist_fetch(query, req_type="ALL"):
         except Exception:
             return {}
 
-# --- FAST SEARCH & CHANNEL LIST GENERATOR ---
 async def perform_search_list(client, message, query, req_type="ALL", is_callback=False):
     safe_query = re.sub(r'[*?+^$[\](){}|\\.]', '', query).strip()
     results = await kingdb.search_channels(safe_query)
@@ -82,7 +79,6 @@ async def perform_search_list(client, message, query, req_type="ALL", is_callbac
     buttons = []
     for ch in filtered[:10]:
         raw_title = ch.get("title", "Unknown")
-        # ✈️ Yahan Button ka naam clean kar diya gaya hai
         clean_btn_name = clean_title_for_anilist(raw_title)
         btn_text = clean_btn_name if len(clean_btn_name) > 1 else raw_title[:25]
         buttons.append([InlineKeyboardButton(btn_text, callback_data=f"show_ch_{ch['_id']}_{req_type}")])
@@ -94,7 +90,6 @@ async def perform_search_list(client, message, query, req_type="ALL", is_callbac
     else:
         await message.reply_photo(photo=random.choice(PICS), caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
 
-# --- COMMANDS (WITH FSUB FILTER) ---
 @Bot.on_message(filters.command("anime") & filters.private & ~filters.bot & fsub_filter, group=-1)
 async def pm_anime_cmd(client, message):
     if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/anime <name>`")
@@ -114,18 +109,13 @@ async def admin_pm_search(client, message):
     await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "ALL", is_callback=False)
     message.stop_propagation()
 
-# --- AUTO SEARCH (ONLY FOR NORMAL USERS) ---
-# Yahan ~filters.bot aur ~filters.me lagaya hai taki loop na bane
-@Bot.on_message(filters.text & filters.private & ~filters.regex(r"^/") & ~filters.bot & ~filters.me, group=-1)
+@Bot.on_message(filters.text & filters.private & ~filters.regex(r"^/") & ~filters.bot & ~filters.me & fsub_filter, group=-1)
 async def normal_user_auto_search(client, message):
-    # Agar admin hai, toh auto-search ignore marega, unko /search use karna padega
     if await is_admin(message.from_user.id): return
-    
     if len(message.text.strip()) < 2: return
     await perform_search_list(client, message, message.text.strip(), "ALL", is_callback=False)
     message.stop_propagation()
 
-# --- CALLBACK ROUTER FOR DETAILS ---
 @Bot.on_callback_query(filters.regex(r"^show_ch_(-?\d+)_(.*)$"), group=-1)
 async def show_channel_details(client, query):
     try:
@@ -150,7 +140,6 @@ async def show_channel_details(client, query):
         else: 
             link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
-        # Access button par bhi clean name dikhayega
         btn = [[InlineKeyboardButton(f"{clean_title[:25]}", url=link.invite_link)]]
 
         if ani_data:
