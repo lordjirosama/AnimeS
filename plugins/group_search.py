@@ -15,7 +15,7 @@ def clean_title_for_anilist(title):
     title = re.sub(r'\[.*?\]|\(.*?\)', '', title)
     title = re.sub(r'(?i)(hindi|dubbed|dub|subbed|sub|dual|audio|multi|1080p|720p|480p|hevc|x264|x265|blu-ray|bluray|web-dl|webrip|season\s*\d+|s\d+)', '', title)
     title = title.split('|')[0].split('-')[0]
-    return title.strip()
+    return title.strip().title()
 
 async def fast_anilist_fetch(query, req_type="ALL"):
     variables = {'search': query}
@@ -23,7 +23,7 @@ async def fast_anilist_fetch(query, req_type="ALL"):
         variables["type"] = req_type.upper()
         graphql = """
         query ($search: String, $type: MediaType) {
-          Media (search: $search, type: $type) {
+          Media (search: $search, type: $type, sort: POPULARITY_DESC) {
             id title { english romaji } type format status episodes chapters seasonYear genres description(asHtml: false)
           }
         }
@@ -31,7 +31,7 @@ async def fast_anilist_fetch(query, req_type="ALL"):
     else:
         graphql = """
         query ($search: String) {
-          Media (search: $search) {
+          Media (search: $search, sort: POPULARITY_DESC) {
             id title { english romaji } type format status episodes chapters seasonYear genres description(asHtml: false)
           }
         }
@@ -44,7 +44,7 @@ async def fast_anilist_fetch(query, req_type="ALL"):
         except Exception: return {}
 
 # --- GENERATE LIST FROM DB ---
-async def perform_search_list_group(client, message, query, req_type="ALL"):
+async def perform_search_list_group(client, message, query, req_type="ALL", is_callback=False):
     safe_query = re.sub(r'[*?+^$[\](){}|\\.]', '', query).strip()
     results = await kingdb.search_channels(safe_query)
     
@@ -54,31 +54,39 @@ async def perform_search_list_group(client, message, query, req_type="ALL"):
         filtered = results
 
     if not filtered:
-        msg = await message.reply(f"❌ **No Results Found For:** `{query}`")
-        await asyncio.sleep(10)
-        try: await msg.delete()
-        except: pass
-        return
+        if is_callback:
+            return await message.reply(f"❌ **No Results Found For:** `{query}`")
+        else:
+            msg = await message.reply(f"❌ **No Results Found For:** `{query}`")
+            await asyncio.sleep(10)
+            try: await msg.delete()
+            except: pass
+            return
 
     buttons = []
-    # Seedha channel names ki list
     for ch in filtered[:10]:
-        title = ch.get("title", "Unknown")
-        buttons.append([InlineKeyboardButton(title, callback_data=f"grp_show_ch_{ch['_id']}_{req_type}")])
+        raw_title = ch.get("title", "Unknown")
+        # ✈️ Clean name on buttons
+        clean_btn_name = clean_title_for_anilist(raw_title)
+        btn_text = clean_btn_name if len(clean_btn_name) > 1 else raw_title[:25]
+        buttons.append([InlineKeyboardButton(btn_text, callback_data=f"grp_show_ch_{ch['_id']}_{req_type}")])
 
     caption = (
         f"🔍 **Search results for:** `{query}`\n\n"
-        "👇 **Please select a channel below:**\n"
+        "👇 **Please select an option below:**\n"
         f"⏳ _This message will be deleted in {AUTO_DELETE_TIME // 60} minutes._"
     )
     
-    sent = await message.reply_photo(photo=random.choice(PICS), caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
-    await asyncio.sleep(AUTO_DELETE_TIME)
-    try: await sent.delete()
-    except: pass
+    if is_callback:
+        await message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=caption), reply_markup=InlineKeyboardMarkup(buttons))
+    else:
+        sent = await message.reply_photo(photo=random.choice(PICS), caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
+        await asyncio.sleep(AUTO_DELETE_TIME)
+        try: await sent.delete()
+        except: pass
 
 # --- MAIN GROUP MESSAGE HANDLER ---
-@Bot.on_message(filters.text & filters.group, group=-1)
+@Bot.on_message(filters.text & filters.group & ~filters.bot, group=-1)
 async def group_search_handler(client, message):
     chat_id = message.chat.id
     text = message.text.strip()
@@ -86,8 +94,8 @@ async def group_search_handler(client, message):
     if not await kingdb.is_group_approved(chat_id): return
     mode = await kingdb.get_search_mode(chat_id)
     
-    if text.lower().startswith("/anime "): return await perform_search_list_group(client, message, text.replace("/anime ", "", 1).strip(), "anime")
-    if text.lower().startswith("/manga "): return await perform_search_list_group(client, message, text.replace("/manga ", "", 1).strip(), "manga")
+    if text.lower().startswith("/anime "): return await perform_search_list_group(client, message, text.replace("/anime ", "", 1).strip(), "anime", False)
+    if text.lower().startswith("/manga "): return await perform_search_list_group(client, message, text.replace("/manga ", "", 1).strip(), "manga", False)
 
     query = ""
     if mode == "command":
@@ -98,7 +106,7 @@ async def group_search_handler(client, message):
         query = text
     
     if len(query) < 2: return 
-    await perform_search_list_group(client, message, query, "ALL")
+    await perform_search_list_group(client, message, query, "ALL", False)
 
 # ================= GROUP SPECIFIC CALLBACK ================= #
 @Bot.on_callback_query(filters.regex(r"^grp_show_ch_(-?\d+)_(.*)$"), group=-1)
@@ -113,7 +121,6 @@ async def group_show_channel_details(client, query):
         await query.answer("Fetching details... ⏳")
         raw_title = ch.get("title", "Unknown")
         
-        # ✈️ Sirf fetch ke liye clean name
         clean_title = clean_title_for_anilist(raw_title)
         ani_data = await fast_anilist_fetch(clean_title, req_type)
         
@@ -124,7 +131,7 @@ async def group_show_channel_details(client, query):
         if join_mode == "request": link = await client.create_chat_invite_link(ch_id, creates_join_request=True, expire_date=expire_date)
         else: link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
-        btn = [[InlineKeyboardButton(f"🎬 Access: {raw_title[:25]}", url=link.invite_link)]]
+        btn = [[InlineKeyboardButton(f"🎬 Access: {clean_title[:25]}", url=link.invite_link)]]
 
         if ani_data:
             ani_title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or clean_title
@@ -152,7 +159,7 @@ async def group_show_channel_details(client, query):
         else:
             poster = random.choice(PICS)
             caption = (
-                f"<blockquote>**{raw_title}**</blockquote>\n\n"
+                f"<blockquote>**{clean_title}**</blockquote>\n\n"
                 "✦ **Status:** Found in Database ✅\n\n"
                 "👇 **Please click the button below to access your files:**\n"
                 f"⏳ _This message will be deleted shortly._"
