@@ -9,7 +9,7 @@ from bot import Bot
 from database.database import kingdb
 from config import OWNER_ID, PICS, LOG_CHANNEL  
 from helper_func import is_userJoin
-from plugins.FORMATS import FORCE_MSG # ✈️ 
+from plugins.FORMATS import FORCE_MSG # ✈️ Tera asli start wala format
 
 async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
@@ -215,7 +215,7 @@ async def dbch_details(client, query):
 
     poster, caption = build_details_caption(ani_data, clean_title)
     btn = [
-        [InlineKeyboardButton(f"{clean_title[:15]}", url=link.invite_link)],
+        [InlineKeyboardButton(f"🎬 Access: {clean_title[:15]}", url=link.invite_link)],
         [InlineKeyboardButton("🔙 Back", callback_data=f"bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="close_panel")]
     ]
     await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
@@ -235,4 +235,43 @@ async def aclk_details(client, query):
     if not db_results and ani_data.get('title', {}).get('romaji'):
         db_results = await kingdb.search_channels(ani_data.get('title', {}).get('romaji'))
 
-    poster, caption = build_details_caption(ani_data
+    poster, caption = build_details_caption(ani_data, title)
+    btn = []
+    
+    if db_results:
+        ch = db_results[0]
+        join_mode, expire_seconds = ch.get("join_mode", "direct"), ch.get("expire_seconds", 0)
+        expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
+        if join_mode == "request": link = await client.create_chat_invite_link(ch['_id'], creates_join_request=True, expire_date=expire_date)
+        else: link = await client.create_chat_invite_link(ch['_id'], expire_date=expire_date)
+        btn.append([InlineKeyboardButton(f"🎬 Access: {title[:15]}", url=link.invite_link)])
+    else:
+        # Not in DB -> Show Request Button!
+        caption += "⚠️ **Status:** __Not available in Database.__\n👇 Click the button below to request an upload!"
+        btn.append([InlineKeyboardButton("📥 Request Upload", callback_data=f"req_{ani_id}")])
+
+    btn.append([InlineKeyboardButton("🔙 Back", callback_data=f"bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="close_panel")])
+    await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
+
+# 3. REQUEST BUTTON HANDLER
+@Bot.on_callback_query(filters.regex(r"^req_(\d+)$"), group=-1)
+async def request_upload(client, query):
+    ani_id = int(query.matches[0].group(1))
+    ani_data = await fast_anilist_fetch_by_id(ani_id)
+    title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or "Unknown"
+    
+    await client.send_message(
+        LOG_CHANNEL, 
+        f"📥 **NEW UPLOAD REQUEST**\n\n👤 **User:** {query.from_user.mention} (`{query.from_user.id}`)\n🎬 **Title:** {title}\n🔗 **Anilist:** https://anilist.co/anime/{ani_id}"
+    )
+    await query.answer("✅ Request Sent to Admins! Hum jaldi upload karenge.", show_alert=True)
+
+# 4. BACK & CLOSE HANDLERS
+@Bot.on_callback_query(filters.regex(r"^bck_(.*)$"), group=-1)
+async def back_to_search(client, query):
+    sq = query.matches[0].group(1)
+    await perform_search_list(client, query.message, sq, "ALL", is_callback=True)
+
+@Bot.on_callback_query(filters.regex(r"^close_panel$"), group=-1)
+async def close_panel_cb(client, query):
+    await query.message.delete()
