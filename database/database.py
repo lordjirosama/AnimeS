@@ -28,7 +28,8 @@ class SidDataBase:
         self.group_data = self.database['groups']
         self.settings = self.database['settings']
         self.channels_col = self.database['saved_channels']
-
+        # ✈️ NEW COLLECTION EXCLUSIVELY FOR INDEXED MOVIE/ANIME CHANNELS
+        self.indexed_channels_data = self.database['indexed_channels']
     # CHANNEL BUTTON SETTINGS
     async def set_channel_button_link(self, button_name: str, button_link: str):
         await self.channel_button_link_data.delete_many({})  # Remove all existing documents
@@ -368,24 +369,24 @@ class SidDataBase:
         if "expire" in data:
             data["expire_seconds"] = data.pop("expire")
 
-        await self.channel_data.update_one(
+        await self.indexed_channels_data.update_one(
             {"_id": channel_id},
             {"$set": data},
             upsert=True
         )
 
     async def get_channel(self, channel_id: int):
-        return await self.channel_data.find_one({"_id": channel_id})
+        return await self.indexed_channels_data.find_one({"_id": channel_id})
 
     async def get_indexed_channels(self):
-        return await self.channel_data.find(
+        return await self.indexed_channels_data.find(
             {"is_indexed": True}
         ).to_list(length=None)
 
     async def search_channel(self, keyword: str):
         regex = {"$regex": keyword, "$options": "i"}
 
-        return await self.channel_data.find({
+        return await self.indexed_channels_data.find({
             "is_indexed": True,
             "$or": [
                 {"title": regex},
@@ -410,7 +411,7 @@ class SidDataBase:
         if added_by:
             data["added_by"] = added_by
 
-        await self.channel_data.update_one(
+        await self.indexed_channels_data.update_one(
             {"_id": channel_id},
             {"$set": data},
             upsert=True
@@ -432,13 +433,13 @@ class SidDataBase:
         data = await self.channels_col.find().to_list(length=None)
         return [x["_id"] for x in data]
         
-    # Index se channel delete karne ke liye
-    async def del_channel(self, channel_id: int):
-        await self.channel_data.delete_one({"_id": channel_id})
+    # Index se channel delete karne ke liye (Name changed to del_indexed_channel)
+    async def del_indexed_channel(self, channel_id: int):
+        await self.indexed_channels_data.delete_one({"_id": channel_id})
 
     # Particular Join Mode ke liye
     async def update_channel_join_mode(self, channel_id, mode: str):
-        await self.channel_data.update_one(
+        await self.indexed_channels_data.update_one(
             {"_id": int(channel_id)},
             {"$set": {"join_mode": mode}}
         )
@@ -446,10 +447,9 @@ class SidDataBase:
     # Search fix
     async def search_channels(self, keyword: str):
         regex = {"$regex": keyword, "$options": "i"}
-        return await self.channel_data.find({
+        return await self.indexed_channels_data.find({
             "is_indexed": True,
             "$or": [{"title": regex}, {"username": regex}]
         }).to_list(length=None)
 
-# Class khatam hone ke baad:
 kingdb = SidDataBase(DB_URI, DB_NAME)
