@@ -1,5 +1,3 @@
-# +++ Made By King [telegram username: @Shidoteshika1] +++
-
 import asyncio
 import os
 import logging
@@ -7,35 +5,38 @@ from logging.handlers import RotatingFileHandler
 
 
 #Bot token @Botfather, --⚠️ REQUIRED--
-TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "8047158900:AAEfUCuBwgLpqfJ1q54TOGE827XmlpHp5YA")
+TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "6814506998:AAFTI9z3RAWRBso39Ey7Y-jjYvufcjocgWs")
 
 #Your API ID from my.telegram.org, --⚠️ REQUIRED--
-APP_ID = int(os.environ.get("APP_ID", "20718334"))
+APP_ID = int(os.environ.get("APP_ID", "21184495"))
 
 #Your API Hash from my.telegram.org, --⚠️ REQUIRED--
-API_HASH = os.environ.get("API_HASH", "4e81464b29d79c58d0ad8a0c55ece4a5")
+API_HASH = os.environ.get("API_HASH", "7238819d51a5280143fc3023a2f1abed")
 
 #Your db channel Id --⚠️ REQUIRED--
-CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002465721727"))
+CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1003322915975"))
 
 #OWNER ID --⚠️ REQUIRED--
-OWNER_ID = int(os.environ.get("OWNER_ID", "5585016974"))
+OWNER_ID = int(os.environ.get("OWNER_ID", "7889947993"))
+
 # Agar aisi line hai:
 # LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "-100123456789") 
 
 # Toh use aise change kar de (int lagana zaroori hai):
-LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1002465721727"))
+LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1003841138322"))
 #SUPPORT_GROUP: This is used for normal users for getting help if they don't understand how to use the bot --⚠ OPTIONAL--
 SUPPORT_GROUP = os.environ.get("SUPPORT_GROUP", "-1002020461301")
 
 #Port
-PORT = os.environ.get("PORT", "8080")
+PORT = os.environ.get("PORT", "8282")
 
 #Database --⚠️ REQUIRED--
-DB_URI = os.environ.get("DATABASE_URL", "mongodb+srv://solo_bot:solo2319p@cluster0.wiqnf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-DB_NAME = os.environ.get("DATABASE_NAME", "Cluster0")
+DB_URI = os.environ.get("DATABASE_URL", "mongodb+srv://akashz9t:akash123@cluster0.zu0io.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 
-TG_BOT_WORKERS = int(os.environ.get("TG_BOT_WORKERS", "4"))
+DB_NAME = os.environ.get("DATABASE_NAME", "file1")
+
+
+TG_BOT_WORKERS = int(os.environ.get("TG_BOT_WORKERS", "20"))
 
 #Collection of pics for Bot // #Optional but atleast one pic link should be replaced if you don't want predefined links
 PICS = (os.environ.get("PICS", "https://envs.sh/ZUb.png?2ftEB=1 https://envs.sh/ZUi.png?KNgjn=1 https://envs.sh/oD5.jpg https://envs.sh/7nm.jpg https://envs.sh/Chb.jpg")).split() #Required
