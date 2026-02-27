@@ -25,7 +25,7 @@ OWNER_ID = int(os.environ.get("OWNER_ID", "7889947993"))
 # Toh use aise change kar de (int lagana zaroori hai):
 LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1003841138322"))
 #SUPPORT_GROUP: This is used for normal users for getting help if they don't understand how to use the bot --⚠ OPTIONAL--
-SUPPORT_GROUP = os.environ.get("SUPPORT_GROUP", "-1002020461301")
+SUPPORT_GROUP = os.environ.get("SUPPORT_GROUP", "-1003642755020")
 
 #Port
 PORT = os.environ.get("PORT", "8282")
