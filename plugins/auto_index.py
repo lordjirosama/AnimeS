@@ -58,8 +58,9 @@ async def is_admin(user_id):
     admins = await kingdb.get_all_admins()
     return user_id == OWNER_ID or user_id in admins
 
-# ================= 1. /INDEX COMMAND (DASHBOARD) ================= #
-@Bot.on_message(filters.command("index") & filters.private, group=-1)
+# ================= 1. /DASH COMMAND (DASHBOARD) ================= #
+# ✈️ Yahan command badal kar /dash kar diya gaya hai
+@Bot.on_message(filters.command(["dash", "panel"]) & filters.private, group=-1)
 async def index_cmd(client, message):
     if not await is_admin(message.from_user.id):
         return await message.reply("❌ **Only Admins are allowed to use this command.**")
@@ -77,7 +78,7 @@ async def index_callbacks(client, query):
 
     data = query.data
 
-    # --- PANEL NAVIGATION (MessageNotModified Error Fixed Here) ---
+    # --- PANEL NAVIGATION ---
     if data == "idx_refresh" or data == "idx_back":
         text, markup = get_index_panel_ui()
         try: 
@@ -110,7 +111,6 @@ async def index_callbacks(client, query):
             )
             ch_id = int(ask.text.strip())
             
-            # DB function is updated to del_indexed_channel
             await kingdb.del_indexed_channel(ch_id) 
             blacklisted_chats.add(ch_id) 
 
@@ -202,7 +202,6 @@ async def index_callbacks(client, query):
         await kingdb.update_channel(chat_id, {"ani_type": new_type})
         await query.answer(f"✅ Category updated to {new_type.upper()}!", show_alert=True)
 
-
 # ================= 3. FORWARD HANDLER (MANUAL ADD) ================= #
 @Bot.on_message(filters.private & filters.forwarded, group=-1)
 async def index_forward(client, message):
@@ -260,22 +259,15 @@ async def index_forward(client, message):
 @Bot.on_chat_member_updated()
 async def auto_index_on_add(client, event: ChatMemberUpdated):
     is_bot_added = False
-    
-    # Check if the member being updated is the bot itself
     if event.new_chat_member and event.new_chat_member.user.is_self:
         if event.new_chat_member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.ADMINISTRATOR]:
             is_bot_added = True
 
-    if not is_bot_added:
-        return
+    if not is_bot_added: return
 
     chat = event.chat
-    if chat.type not in [enums.ChatType.CHANNEL, enums.ChatType.SUPERGROUP]:
-        return
-
-    # Check Blacklist
-    if chat.id in blacklisted_chats:
-        return
+    if chat.type not in [enums.ChatType.CHANNEL, enums.ChatType.SUPERGROUP]: return
+    if chat.id in blacklisted_chats: return
 
     adder_id = event.from_user.id
     admins = await kingdb.get_all_admins()
@@ -306,3 +298,4 @@ async def auto_index_on_add(client, event: ChatMemberUpdated):
         )
     except Exception as e:
         print(f"Auto Index Error: {e}")
+        
