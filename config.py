@@ -2,41 +2,43 @@ import asyncio
 import os
 import logging
 from logging.handlers import RotatingFileHandler
+from dotenv import load_dotenv
+load_dotenv()
 
 
 #Bot token @Botfather, --⚠️ REQUIRED--
-TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "6814506998:AAFTI9z3RAWRBso39Ey7Y-jjYvufcjocgWs")
+TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "")
 
 #Your API ID from my.telegram.org, --⚠️ REQUIRED--
-APP_ID = int(os.environ.get("APP_ID", "21184495"))
+APP_ID = int(os.environ.get("APP_ID", ""))
 
 #Your API Hash from my.telegram.org, --⚠️ REQUIRED--
-API_HASH = os.environ.get("API_HASH", "7238819d51a5280143fc3023a2f1abed")
+API_HASH = os.environ.get("API_HASH", "")
 
 #Your db channel Id --⚠️ REQUIRED--
-CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1003322915975"))
+CHANNEL_ID = int(os.environ.get("CHANNEL_ID", ""))
 
 #OWNER ID --⚠️ REQUIRED--
-OWNER_ID = int(os.environ.get("OWNER_ID", "7889947993"))
+OWNER_ID = int(os.environ.get("OWNER_ID", ""))
 
 # Agar aisi line hai:
 # LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "-100123456789") 
 
 # Toh use aise change kar de (int lagana zaroori hai):
-LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1003841138322"))
+LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", ""))
 #SUPPORT_GROUP: This is used for normal users for getting help if they don't understand how to use the bot --⚠ OPTIONAL--
-SUPPORT_GROUP = os.environ.get("SUPPORT_GROUP", "-1003642755020")
+SUPPORT_GROUP = os.environ.get("SUPPORT_GROUP", "")
 
 #Port
-PORT = os.environ.get("PORT", "8282")
+PORT = os.environ.get("PORT", "")
 
 #Database --⚠️ REQUIRED--
-DB_URI = os.environ.get("DATABASE_URL", "mongodb+srv://akashz9t:akash123@cluster0.zu0io.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+DB_URI = os.environ.get("DATABASE_URL", "")
 
-DB_NAME = os.environ.get("DATABASE_NAME", "file1")
+DB_NAME = os.environ.get("DATABASE_NAME", "")
 
 
-TG_BOT_WORKERS = int(os.environ.get("TG_BOT_WORKERS", "20"))
+TG_BOT_WORKERS = int(os.environ.get("TG_BOT_WORKERS", ""))
 
 #Collection of pics for Bot // #Optional but atleast one pic link should be replaced if you don't want predefined links
 PICS = (os.environ.get("PICS", "https://envs.sh/ZUb.png?2ftEB=1 https://envs.sh/ZUi.png?KNgjn=1 https://envs.sh/oD5.jpg https://envs.sh/7nm.jpg https://envs.sh/Chb.jpg")).split() #Required
