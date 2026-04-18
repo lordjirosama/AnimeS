@@ -193,21 +193,23 @@ def build_details_caption(ani_data, clean_title):
         status = ani_data.get('status', 'Unknown')
         year = ani_data.get('seasonYear', 'N/A')
         genres = ", ".join(ani_data.get('genres', [])[:3]) if ani_data.get('genres') else "N/A"
-        eps_chaps = f"✦ **Chapters:** {ani_data.get('chapters', 'N/A')}" if ani_data.get('type') == "MANGA" else f"✦ **Episodes:** {ani_data.get('episodes', 'N/A')}"
+        eps_chaps = f"✦ <b>Chapters:</b> {ani_data.get('chapters', 'N/A')}" if ani_data.get('type') == "MANGA" else f"✦ <b>Episodes:</b> {ani_data.get('episodes', 'N/A')}"
         synopsis = str(ani_data.get('description', 'No synopsis available.')).replace("<br>", "").replace("<i>", "").replace("</i>", "")
-        if len(synopsis) > 200: synopsis = synopsis[:200] + "..."
+        if len(synopsis) > 200:
+            synopsis = synopsis[:200] + "..."
         poster = f"https://img.anili.st/media/{ani_data.get('id')}" if ani_data.get('id') else random.choice(PICS)
 
         caption = (
-            f"<blockquote>**{ani_title}**</blockquote>\n\n"
-            f"✦ **Type:** {ani_format}   |   **Status:** {status}\n"
-            f"{eps_chaps}   |   **Year:** {year}\n"
-            f"✦ **Genres:** {genres}\n"
-            f"✦ **Synopsis:** {synopsis}\n\n"
+            f"<blockquote><b>{ani_title}</b></blockquote>\n\n"
+            f"✦ <b>Type:</b> {ani_format}   |   <b>Status:</b> {status}\n"
+            f"{eps_chaps}   |   <b>Year:</b> {year}\n"
+            f"✦ <b>Genres:</b> {genres}\n"
+            f"✦ <b>Synopsis:</b> {synopsis}\n\n"
         )
         return poster, caption
-    else: return random.choice(PICS), f"<blockquote>**{clean_title}**</blockquote>\n\n✦ **Status:** Found in Database ✅\n\n"
-
+    else:
+        return random.choice(PICS), f"<blockquote><b>{clean_title}</b></blockquote>\n\n✦ <b>Status:</b> Found in Database ✅\n\n"
+        
 @Bot.on_callback_query(filters.regex(r"^dbch_(-?\d+)_(.*)_(.*)$"), group=-1)
 async def dbch_details(client, query):
     ch_id, req_type, sq = int(query.matches[0].group(1)), query.matches[0].group(2), query.matches[0].group(3)
