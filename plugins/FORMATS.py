@@ -1,6 +1,4 @@
-# +++ Made By King [telegram username: @Shidoteshika1] +++
-
-#text formatting....
+#Text Formatting....
 
 on_pic = "https://envs.sh/7nm.jpg"
 off_pic = "https://envs.sh/7nm.jpg"
@@ -8,9 +6,10 @@ files_cmd_pic = "https://envs.sh/7nm.jpg"
 autodel_cmd_pic = "https://envs.sh/7nm.jpg"
 
 #start message
-START_MSG = """<b>⚡ Hᴇʏ, {mention} ~
+START_MSG = """<b>Hᴇʏ {mention}
 
-<blockquote expandable>ɪ ᴀᴍ ғɪʟᴇ sᴛᴏʀᴇ ʙᴏᴛ, ɪ ᴄᴀɴ sᴛᴏʀᴇ ᴘʀɪᴠᴀᴛᴇ ғɪʟᴇs ɪɴ sᴘᴇᴄɪғɪᴇᴅ ᴄʜᴀɴɴᴇʟ ᴀɴᴅ ᴏᴛʜᴇʀ ᴜsᴇʀs ᴄᴀɴ ᴀᴄᴄᴇss ɪᴛ ғʀᴏᴍ sᴘᴇᴄɪᴀʟ ʟɪɴᴋ.</blockquote></b>"""
+ɪ ᴀᴍ ᴊᴜsᴛ ᴀɴɪᴍᴇ ᴄʜᴀɴɴᴇʟ sᴇᴀʀᴄʜ ʙᴏᴛ  
+Ex : one piece </b>"""
 
 #Force sub message 
 FORCE_MSG = """<b><blockquote>⚠️ Hᴇʏ, {mention} ×</blockquote>
