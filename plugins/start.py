@@ -1,5 +1,3 @@
-# +++ Made By King [telegram username: @Shidoteshika1] +++
-
 import os
 import sys
 import random
@@ -102,27 +100,33 @@ async def start_command(client: Client, message: Message):
         if AUTO_DEL and last_message:
                 asyncio.create_task(auto_del_notification(client.username, last_message, DEL_TIMER, message.command[1]))
                         
-    else:   
-        reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("• ғᴏʀ ᴍᴏʀᴇ •", url='https://t.me/AnimeMajesty')],
-                    [InlineKeyboardButton("• ᴀʙᴏᴜᴛ", callback_data='about'),
-                     InlineKeyboardButton("ʜᴇʟᴘ •", url='https://t.me/MysteryXClan')],
-                    [InlineKeyboardButton("• ᴏᴜʀ ᴄᴏᴍᴍᴜɴɪᴛʏ •", url='https://t.me/Team_Majesty')],
-                ])
-        await message.reply_photo(
-            photo = random.choice(PICS),
-            caption = START_MSG.format(
-                first = message.from_user.first_name,
-                last = message.from_user.last_name,
-                username = None if not message.from_user.username else '@' + message.from_user.username,
-                mention = message.from_user.mention,
-                id = message.from_user.id
-            ),
-            reply_markup = reply_markup,
-	        message_effect_id=5104841245755180586 #🔥
-        )
-        try: await message.delete()
-        except: pass
+else:
+    SHOW_BUTTONS = False  # False = hide buttons
+
+    if SHOW_BUTTONS:
+        reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("• ғᴏʀ ᴍᴏʀᴇ •", url='https://t.me/Anime_Exhibition')]
+        ])
+    else:
+        reply_markup = None
+
+    await message.reply_photo(
+        photo=random.choice(PICS),
+        caption=START_MSG.format(
+            first=message.from_user.first_name,
+            last=message.from_user.last_name,
+            username=None if not message.from_user.username else '@' + message.from_user.username,
+            mention=message.from_user.mention,
+            id=message.from_user.id
+        ),
+        reply_markup=reply_markup,
+        message_effect_id=5104841245755180586
+    )
+
+    try:
+        await message.delete()
+    except:
+        pass
 
    
 ##===================================================================================================================##
