@@ -14,6 +14,7 @@ from plugins.autoDelete import auto_del_notification, delete_message
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from helper_func import banUser, is_userJoin, is_admin, subscribed, encode, decode, get_messages
 
+SHOW_BUTTONS = False  # False = hide buttons
 
 @Bot.on_message(filters.command('start') & filters.private & ~banUser & subscribed)
 async def start_command(client: Client, message: Message): 
@@ -101,8 +102,6 @@ async def start_command(client: Client, message: Message):
                 asyncio.create_task(auto_del_notification(client.username, last_message, DEL_TIMER, message.command[1]))
                         
 else:
-    SHOW_BUTTONS = False  # False = hide buttons
-
     if SHOW_BUTTONS:
         reply_markup = InlineKeyboardMarkup([
             [InlineKeyboardButton("• ғᴏʀ ᴍᴏʀᴇ •", url='https://t.me/Anime_Exhibition')]
