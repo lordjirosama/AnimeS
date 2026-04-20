@@ -22,15 +22,21 @@ async def start_command(client: Client, message: Message):
     id = message.from_user.id  
     
     if not await kingdb.present_user(id):
-        try: await kingdb.add_user(id)
-        except: pass
+        try:
+            await kingdb.add_user(id)
+        except:
+            pass
                 
     text = message.text        
-    if len(text)>7:
+
+    # ================= MAIN LOGIC =================
+    if len(text) > 7:
         await message.delete()
 
-        try: base64_string = text.split(" ", 1)[1]
-        except: return
+        try:
+            base64_string = text.split(" ", 1)[1]
+        except:
+            return
                 
         string = await decode(base64_string)
         argument = string.split("-")
@@ -43,7 +49,7 @@ async def start_command(client: Client, message: Message):
                 return
                     
             if start <= end:
-                ids = range(start,end+1)
+                ids = range(start, end + 1)
             else:
                 ids = []
                 i = start
@@ -54,80 +60,106 @@ async def start_command(client: Client, message: Message):
                         break
                             
         elif len(argument) == 2:
-            try: ids = [int(int(argument[1]) / abs(client.db_channel.id))]
-            except: return
+            try:
+                ids = [int(int(argument[1]) / abs(client.db_channel.id))]
+            except:
+                return
                     
         last_message = None
         await message.reply_chat_action(ChatAction.UPLOAD_DOCUMENT)  
         
-        try: messages = await get_messages(client, ids)
-        except: return await message.reply("<b><i>Sᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ..!</i></b>")
+        try:
+            messages = await get_messages(client, ids)
+        except:
+            return await message.reply("<b><i>Sᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ..!</i></b>")
             
-        AUTO_DEL, DEL_TIMER, HIDE_CAPTION, CHNL_BTN, PROTECT_MODE = await asyncio.gather(kingdb.get_auto_delete(), kingdb.get_del_timer(), kingdb.get_hide_caption(), kingdb.get_channel_button(), kingdb.get_protect_content())   
-        if CHNL_BTN: button_name, button_link = await kingdb.get_channel_button_link()
+        AUTO_DEL, DEL_TIMER, HIDE_CAPTION, CHNL_BTN, PROTECT_MODE = await asyncio.gather(
+            kingdb.get_auto_delete(),
+            kingdb.get_del_timer(),
+            kingdb.get_hide_caption(),
+            kingdb.get_channel_button(),
+            kingdb.get_protect_content()
+        )   
+
+        if CHNL_BTN:
+            button_name, button_link = await kingdb.get_channel_button_link()
             
         for idx, msg in enumerate(messages):
             if bool(CUSTOM_CAPTION) & bool(msg.document):
-                caption = CUSTOM_CAPTION.format(previouscaption = "" if not msg.caption else msg.caption.html, filename = msg.document.file_name)
+                caption = CUSTOM_CAPTION.format(
+                    previouscaption="" if not msg.caption else msg.caption.html,
+                    filename=msg.document.file_name
+                )
 
             elif HIDE_CAPTION and (msg.document or msg.audio):
                 caption = ""
-
             else:
                 caption = "" if not msg.caption else msg.caption.html
 
             if CHNL_BTN:
-                reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(text=button_name, url=button_link)]]) if msg.document or msg.photo or msg.video or msg.audio else None
+                reply_markup = InlineKeyboardMarkup(
+                    [[InlineKeyboardButton(text=button_name, url=button_link)]]
+                ) if msg.document or msg.photo or msg.video or msg.audio else None
             else:
                 reply_markup = msg.reply_markup   
                     
             try:
-                copied_msg = await msg.copy(chat_id=id, caption=caption, parse_mode=ParseMode.HTML, reply_markup=reply_markup, protect_content=PROTECT_MODE)
+                copied_msg = await msg.copy(
+                    chat_id=id,
+                    caption=caption,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup,
+                    protect_content=PROTECT_MODE
+                )
                 await asyncio.sleep(0.1)
 
                 if AUTO_DEL:
                     asyncio.create_task(delete_message(copied_msg, DEL_TIMER))
-                    if idx == len(messages) - 1: last_message = copied_msg
+                    if idx == len(messages) - 1:
+                        last_message = copied_msg
 
             except FloodWait as e:
                 await asyncio.sleep(e.x)
-                copied_msg = await msg.copy(chat_id=id, caption=caption, parse_mode=ParseMode.HTML, reply_markup=reply_markup, protect_content=PROTECT_MODE)
-                await asyncio.sleep(0.1)
-                
-                if AUTO_DEL:
-                    asyncio.create_task(delete_message(copied_msg, DEL_TIMER))
-                    if idx == len(messages) - 1: last_message = copied_msg
-                        
+                copied_msg = await msg.copy(
+                    chat_id=id,
+                    caption=caption,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup,
+                    protect_content=PROTECT_MODE
+                )
+
         if AUTO_DEL and last_message:
-                asyncio.create_task(auto_del_notification(client.username, last_message, DEL_TIMER, message.command[1]))
-                        
-else:
-    if SHOW_BUTTONS:
-        reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("• ғᴏʀ ᴍᴏʀᴇ •", url='https://t.me/Anime_Exhibition')]
-        ])
+            asyncio.create_task(
+                auto_del_notification(client.username, last_message, DEL_TIMER, message.command[1])
+            )
+
+    # ================= START MESSAGE =================
     else:
-        reply_markup = None
+        if SHOW_BUTTONS:
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("• ғᴏʀ ᴍᴏʀᴇ •", url='https://t.me/Anime_Exhibition')]
+            ])
+        else:
+            reply_markup = None
 
-    await message.reply_photo(
-        photo=random.choice(PICS),
-        caption=START_MSG.format(
-            first=message.from_user.first_name,
-            last=message.from_user.last_name,
-            username=None if not message.from_user.username else '@' + message.from_user.username,
-            mention=message.from_user.mention,
-            id=message.from_user.id
-        ),
-        reply_markup=reply_markup,
-        message_effect_id=5104841245755180586
-    )
+        await message.reply_photo(
+            photo=random.choice(PICS),
+            caption=START_MSG.format(
+                first=message.from_user.first_name,
+                last=message.from_user.last_name,
+                username=None if not message.from_user.username else '@' + message.from_user.username,
+                mention=message.from_user.mention,
+                id=message.from_user.id
+            ),
+            reply_markup=reply_markup,
+            message_effect_id=5104841245755180586 #🔥
+        )
 
-    try:
-        await message.delete()
-    except:
-        pass
-
-   
+        try:
+            await message.delete()
+        except:
+            pass
+            
 ##===================================================================================================================##
 
 #TRIGGRED START MESSAGE FOR HANDLE FORCE SUB MESSAGE AND FORCE SUB CHANNEL IF A USER NOT JOINED A CHANNEL
