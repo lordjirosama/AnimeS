@@ -128,7 +128,7 @@ async def perform_search_list(client, message, query, req_type="ALL", is_callbac
 
     if not db_results and not ani_results:
         if is_auto: return 
-        text = f"❌ **No Exact Results Found For:** `{query}`\n_Make sure to type the full, correct name!_"
+        text = f"<b>❌ No Exact Results Found For:** `{query}`\n_Make sure to type the full, correct name!</b>"
         if is_callback: return await message.reply(text)
         else: return await message.reply(text)
 
@@ -149,26 +149,26 @@ async def perform_search_list(client, message, query, req_type="ALL", is_callbac
             added_titles.add(title.lower())
             buttons.append([InlineKeyboardButton(title[:30], callback_data=f"aclk_{media['id']}_{req_type}_{short_query}")])
 
-    buttons.append([InlineKeyboardButton("✖️ Close", callback_data="close_panel")])
-    caption = f"🔍 **Search results for:** `{query}`\n\n👇 **Select an option below:**"
+    buttons.append([InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")])
+    caption = f"<b>🔍 Search results for:** `{query}`\n\n👇 **Select an option below:</b>"
     
     if is_callback: await message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=caption), reply_markup=InlineKeyboardMarkup(buttons))
     else: await message.reply_photo(photo=random.choice(PICS), caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
 
 @Bot.on_message(filters.command("anime") & filters.private & ~filters.bot, group=-1)
 async def pm_anime_cmd(client, message):
-    if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/anime <name>`")
+    if len(message.command) < 2: return await message.reply("Usage: `/anime <name>`")
     await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "anime", False, False)
 
 @Bot.on_message(filters.command("manga") & filters.private & ~filters.bot, group=-1)
 async def pm_manga_cmd(client, message):
-    if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/manga <name>`")
+    if len(message.command) < 2: return await message.reply("Usage: `/manga <name>`")
     await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "manga", False, False)
 
 @Bot.on_message(filters.command("search") & filters.private & ~filters.bot, group=-1)
 async def admin_pm_search(client, message):
     if not await is_admin(message.from_user.id): return 
-    if len(message.command) < 2: return await message.reply("ℹ️ **Usage:** `/search <name>`")
+    if len(message.command) < 2: return await message.reply("Usage: `/search <name>`")
     await perform_search_list(client, message, message.text.split(" ", 1)[1].strip(), "ALL", False, False)
 
 @Bot.on_message(filters.text & filters.private & ~filters.regex(r"^/") & ~filters.bot & ~filters.me, group=-1)
@@ -235,10 +235,10 @@ async def dbch_details(client, query):
     else: link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
     poster, caption = build_details_caption(ani_data, clean_title)
-    caption += "👇 **Please click the button below to access your files:**"
+    caption += "<b>Please click the button below to access your files.</b>"
     btn = [
         [InlineKeyboardButton(f"🎬 Access: {clean_title[:15]}", url=link.invite_link)],
-        [InlineKeyboardButton("🔙 Back", callback_data=f"bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="close_panel")]
+        [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")]
     ]
     await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
 
@@ -263,13 +263,13 @@ async def aclk_details(client, query):
         expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
         if join_mode == "request": link = await client.create_chat_invite_link(ch['_id'], creates_join_request=True, expire_date=expire_date)
         else: link = await client.create_chat_invite_link(ch['_id'], expire_date=expire_date)
-        caption += "👇 **Please click the button below to access your files:**"
+        caption += "<b>Please click the button below to access your files</b>"
         btn.append([InlineKeyboardButton(f"🎬 Access: {title[:15]}", url=link.invite_link)])
     else:
-        caption += "⚠️ **Status:** __Not available in Database.__\n👇 Click the button below to request an upload!"
-        btn.append([InlineKeyboardButton("📥 Request Upload", callback_data=f"req_{ani_id}")])
+        caption += "<b>⚠️ Status: Not available in Database \n👇 Click the button below to request an upload!</b>"
+        btn.append([InlineKeyboardButton("ʀᴇǫᴜᴇꜱᴛ ᴜᴘʟᴏᴀᴅ", callback_data=f"req_{ani_id}")])
 
-    btn.append([InlineKeyboardButton("🔙 Back", callback_data=f"bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="close_panel")])
+    btn.append([InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")])
     await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
 
 @Bot.on_callback_query(filters.regex(r"^req_(\d+)$"), group=-1)
@@ -280,7 +280,7 @@ async def request_upload(client, query):
     
     await client.send_message(
         LOG_CHANNEL, 
-        f"📥 **NEW UPLOAD REQUEST**\n\n👤 **User:** {query.from_user.mention} (`{query.from_user.id}`)\n🎬 **Title:** {title}\n🔗 **Anilist:** https://anilist.co/anime/{ani_id}"
+        f"📥 NEW UPLOAD REQUEST**\n\n👤 User: {query.from_user.mention} (`{query.from_user.id}`)\n🎬 Title: {title}\n🔗 Anilist: https://anilist.co/anime/{ani_id}"
     )
     await query.answer("✅ Request Sent to Admins! Hum jaldi upload karenge.", show_alert=True)
 
@@ -292,4 +292,4 @@ async def back_to_search(client, query):
 @Bot.on_callback_query(filters.regex(r"^close_panel$"), group=-1)
 async def close_panel_cb(client, query):
     await query.message.delete()
-            
+                 
