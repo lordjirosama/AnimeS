@@ -14,7 +14,7 @@ from plugins.autoDelete import auto_del_notification, delete_message
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from helper_func import banUser, is_userJoin, is_admin, subscribed, encode, decode, get_messages
 
-SHOW_BUTTONS = True  # False = hide buttons
+SHOW_BUTTONS = False  # False = hide buttons
 
 @Bot.on_message(filters.command('start') & filters.private & ~banUser & subscribed)
 async def start_command(client: Client, message: Message): 
