@@ -150,7 +150,7 @@ async def perform_search_list(client, message, query, req_type="ALL", is_callbac
             buttons.append([InlineKeyboardButton(title[:30], callback_data=f"aclk_{media['id']}_{req_type}_{short_query}")])
 
     buttons.append([InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")])
-    caption = f"<b>🔍 Search results for:** `{query}`\n\n👇 **Select an option below:</b>"
+    caption = f"<b>ꜱᴇᴀʀᴄʜ ʀᴇꜱᴜʟᴛꜱ ғᴏʀ: `{query}` \n\n ꜱᴇʟᴇᴄᴛ ᴀɴ ᴏᴘᴛɪᴏɴ ʙᴇʟᴏᴡ:</b>"
     
     if is_callback: await message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=caption), reply_markup=InlineKeyboardMarkup(buttons))
     else: await message.reply_photo(photo=random.choice(PICS), caption=caption, reply_markup=InlineKeyboardMarkup(buttons))
