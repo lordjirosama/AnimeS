@@ -1,5 +1,3 @@
-# +++ Made By King [telegram username: @Shidoteshika1] +++
-
 from bot import Bot
 import asyncio
 from pyrogram.enums import ParseMode, ChatAction
@@ -365,7 +363,7 @@ async def get_banuser_list(client:Client, message: Message):
 #=====================================================================================##
 
 # Auto Delete Setting Commands
-@Bot.on_message(filters.command('auto_del') & filters.private & ~banUser)
+@Bot.on_message(filters.command('auto_del') & filters.private & is_admin)
 async def autoDelete_settings(client, message):
     await message.reply_chat_action(ChatAction.TYPING)
 
