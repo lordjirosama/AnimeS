@@ -266,7 +266,7 @@ async def aclk_details(client, query):
         caption += "<b>Please click the button below to access your files</b>"
         btn.append([InlineKeyboardButton(f"🎬 Access: {title[:15]}", url=link.invite_link)])
     else:
-        caption += "<b>⚠️ Status: Not available in Database \n👇 Click the button below to request an upload!</b>"
+        caption += "<b>⚠️ Status: Not available in Database \n👇 Click the button below to request to upload!</b>"
         btn.append([InlineKeyboardButton("ʀᴇǫᴜᴇꜱᴛ ᴜᴘʟᴏᴀᴅ", callback_data=f"req_{ani_id}")])
 
     btn.append([InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")])
