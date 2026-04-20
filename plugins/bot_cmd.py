@@ -1,5 +1,3 @@
-# +++ Made By King [telegram username: @Shidoteshika1] +++
-
 import os
 import asyncio
 from asyncio import Lock
@@ -154,29 +152,29 @@ async def bcmd(bot: Bot, message: Message):
 
 #--------------------------------------------------------------[[NORMAL USER ACCESSIBLE COMMANDS]]----------------------------------------------------------------------#
 
-@Bot.on_message(filters.command('forcesub') & filters.private & ~banUser)
+@Bot.on_message(filters.command('forcesub') & filters.private & is_admin)
 async def fsub_commands(client: Client, message: Message):
     button = [[InlineKeyboardButton("Cʟᴏsᴇ ✖️", callback_data="close")]]
     await message.reply(text=FSUB_CMD_TXT, reply_markup=InlineKeyboardMarkup(button), quote=True)
 
 
-@Bot.on_message(filters.command('users') & filters.private & ~banUser)
+@Bot.on_message(filters.command('users') & filters.private & is_admin)
 async def user_setting_commands(client: Client, message: Message):
     button = [[InlineKeyboardButton("Cʟᴏsᴇ ✖️", callback_data="close")]]
     await message.reply(text=USER_CMD_TXT, reply_markup=InlineKeyboardMarkup(button), quote=True)
 
     
 HELP = "https://graph.org//file/10f310dd6a7cb56ad7c0b.jpg"
-@Bot.on_message(filters.command('help') & filters.private & ~banUser)
+@Bot.on_message(filters.command('help') & filters.private & is_admin)
 async def help(client: Client, message: Message):
     buttons = [
         [
-            InlineKeyboardButton("Oᴡɴᴇʀ", url="https://t.me/Madhav_S9"), 
-            InlineKeyboardButton("Dᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/cosmic_awaken")
+            InlineKeyboardButton("Oᴡɴᴇʀ", url="https://t.me/ll"), 
+            InlineKeyboardButton("Dᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/lll")
         ]
     ]
     if SUPPORT_GROUP:
-        buttons.insert(0, [InlineKeyboardButton("Sᴜᴘᴘᴏʀᴛ Cʜᴀᴛ Gʀᴏᴜᴘ", url="https://t.me/+CJeYZa6XqoY1ZDY1")])
+        buttons.insert(0, [InlineKeyboardButton("Sᴜᴘᴘᴏʀᴛ Cʜᴀᴛ Gʀᴏᴜᴘ", url="https://t.me/+lll")])
 
     try:
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -193,5 +191,5 @@ async def help(client: Client, message: Message):
             message_effect_id = 5046509860389126442 #🎉
         )
     except Exception as e:
-        return await message.reply(f"<b><i>! Eʀʀᴏʀ, Cᴏɴᴛᴀᴄᴛ ᴅᴇᴠᴇʟᴏᴘᴇʀ ᴛᴏ sᴏʟᴠᴇ ᴛʜᴇ ɪssᴜᴇs @i_killed_my_clan</i></b>\n<blockquote expandable><b>Rᴇᴀsᴏɴ:</b> {e}</blockquote>")
+        return await message.reply(f"<b><i>! Eʀʀᴏʀ, Cᴏɴᴛᴀᴄᴛ ᴅᴇᴠᴇʟᴏᴘᴇʀ ᴛᴏ sᴏʟᴠᴇ ᴛʜᴇ ɪssᴜᴇs </i></b>\n<blockquote expandable><b>Rᴇᴀsᴏɴ:</b> {e}</blockquote>")
    
