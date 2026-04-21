@@ -9,7 +9,7 @@ from config import OWNER_ID, LOG_CHANNEL, PICS
 
 # --- STATE MANAGEMENT ---
 index_wait = set()
-blacklisted_chats = set() # Channels removed via command won't auto-index
+blacklisted_chats = set()
 
 def get_time():
     return datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
@@ -77,7 +77,6 @@ async def index_callbacks(client, query):
 
     data = query.data
 
-    # --- PANEL NAVIGATION (MessageNotModified Error Fixed Here) ---
     if data == "idx_refresh" or data == "idx_back":
         text, markup = get_index_panel_ui()
         try: 
@@ -92,13 +91,22 @@ async def index_callbacks(client, query):
         except Exception:
             pass
 
-    # --- ADD INDEX ---
+    # --- ADD INDEX (FIX: Store in DB instead of memory) ---
     elif data == "idx_add":
+        # ✅ FIX: Save to DB so it survives bot restart
+        await kingdb.set_user_state(user_id, "index_wait")
         index_wait.add(user_id)
+        
+        print(f"[DEBUG] idx_add: Added user {user_id} to index_wait. Current set: {index_wait}")
+        
         await query.answer("Forward mode activated! Send a message now.", show_alert=True)
-        await query.message.reply("📥 **Indexing Mode Activated**\n\nPlease **Forward** a message from the target Channel or Group.\n_(Note: The bot must be an admin there)_")
+        await query.message.reply(
+            "📥 **Indexing Mode Activated**\n\n"
+            "Please **Forward** a message from the target Channel or Group.\n"
+            "_(Note: The bot must be an admin there)_\n\n"
+            f"🔑 **Your Session ID:** `{user_id}` _(for debug)_"
+        )
 
-    # --- REMOVE INDEX (WITH BLACKLIST) ---
     elif data == "idx_remove":
         await query.message.delete()
         try:
@@ -109,25 +117,22 @@ async def index_callbacks(client, query):
                 filters=filters.user(user_id)
             )
             ch_id = int(ask.text.strip())
-            
-            # DB function is updated to del_indexed_channel
             await kingdb.del_indexed_channel(ch_id) 
             blacklisted_chats.add(ch_id) 
 
             text, markup = get_index_panel_ui()
             await ask.reply_photo(
                 photo=random.choice(PICS),
-                caption=f"✅ **Channel `{ch_id}` removed successfully!**\n\n🚫 _It has been blacklisted and will not be auto-indexed again unless manually added via the Add Index button._",
+                caption=f"✅ **Channel `{ch_id}` removed successfully!**\n\n🚫 _Blacklisted._",
                 reply_markup=markup
             )
         except asyncio.TimeoutError:
-            await client.send_message(query.message.chat.id, "❗️ **Error:** Request timed out. Please try again.")
+            await client.send_message(query.message.chat.id, "❗️ **Error:** Request timed out.")
         except ValueError:
-            await client.send_message(query.message.chat.id, "❗️ **Error:** Invalid ID format. Please provide a numeric ID.")
+            await client.send_message(query.message.chat.id, "❗️ **Error:** Invalid ID format.")
 
-    # --- SHOW LISTS (ANIME/MANGA/ALL) ---
     elif data.startswith("idx_show_"):
-        cat = data.split("_")[2] # anime, manga, or all
+        cat = data.split("_")[2]
         channels = await kingdb.get_indexed_channels()
         
         if cat != "all":
@@ -141,7 +146,6 @@ async def index_callbacks(client, query):
             title = ch.get('title', 'Unknown')
             msg_text += f"▪️ **{title}** (`{ch['_id']}`)\n"
             
-        # Truncate if too long
         if len(msg_text) > 1000:
             msg_text = msg_text[:950] + "\n\n_...and more (List truncated)._"
             
@@ -151,10 +155,9 @@ async def index_callbacks(client, query):
         except Exception:
             pass
 
-    # --- REINDEX ALL COMMAND ---
     elif data == "idx_reindex":
         await query.message.delete()
-        status_msg = await client.send_message(query.message.chat.id, "🔄 **Reindexing started...**\n_Please wait, fetching latest data from Telegram._")
+        status_msg = await client.send_message(query.message.chat.id, "🔄 **Reindexing started...**")
         
         channels = await kingdb.get_indexed_channels()
         success, failed = 0, 0
@@ -172,7 +175,7 @@ async def index_callbacks(client, query):
                 )
                 await kingdb.update_channel(chat.id, {"ani_type": ch.get("ani_type", "anime")})
                 success += 1
-                await asyncio.sleep(1) # Flood wait protection
+                await asyncio.sleep(1)
             except Exception:
                 failed += 1
 
@@ -181,73 +184,103 @@ async def index_callbacks(client, query):
         await client.send_photo(
             query.message.chat.id,
             photo=random.choice(PICS),
-            caption=f"✅ **Reindex Operation Completed!**\n\n📊 **Successfully Updated:** `{success}`\n❌ **Failed/Unavailable:** `{failed}`\n\n" + text,
+            caption=f"✅ **Reindex Done!**\n\n✔️ Updated: `{success}`\n❌ Failed: `{failed}`\n\n" + text,
             reply_markup=markup
         )
 
-    # --- LOG CHANNEL CALLBACKS ---
     elif data.startswith("log_remove_"):
         chat_id = int(data.split("_")[2])
-        
         await kingdb.del_indexed_channel(chat_id)
-        
         blacklisted_chats.add(chat_id)
-        await query.message.edit_text(f"🗑 **Channel Removed Permanently:** `{chat_id}`")
+        await query.message.edit_text(f"🗑 **Channel Removed:** `{chat_id}`")
         
     elif data.startswith("settype_"):
         parts = data.split("_")
-        new_type = parts[1] # anime or manga
+        new_type = parts[1]
         chat_id = int(parts[2])
-        
         await kingdb.update_channel(chat_id, {"ani_type": new_type})
         await query.answer(f"✅ Category updated to {new_type.upper()}!", show_alert=True)
-        
+
+
 # ================= 3. FORWARD HANDLER (MANUAL ADD) ================= #
 @Bot.on_message(filters.private & filters.forwarded, group=-1)
 async def index_forward(client, message):
     user_id = message.from_user.id
-    if user_id not in index_wait: return
     
-    index_wait.remove(user_id)
+    print(f"[DEBUG] Forward received from user: {user_id}")
+    print(f"[DEBUG] Current index_wait set: {index_wait}")
     
-    # --- FIX: Handle all Telegram forward types ---
+    # ✅ FIX: Check DB state as fallback (survives bot restart)
+    in_memory = user_id in index_wait
+    db_state = await kingdb.get_user_state(user_id)
+    in_db = db_state == "index_wait"
+    
+    print(f"[DEBUG] in_memory={in_memory}, in_db={in_db}, db_state={db_state}")
+    
+    if not in_memory and not in_db:
+        print(f"[DEBUG] User {user_id} NOT in index_wait — skipping forward handler")
+        return  # Let other handlers process it
+    
+    # Clean up state
+    index_wait.discard(user_id)
+    await kingdb.clear_user_state(user_id)
+    
+    print(f"[DEBUG] Processing forward for indexing...")
+    print(f"[DEBUG] message.forward_from_chat = {message.forward_from_chat}")
+    print(f"[DEBUG] message.sender_chat = {message.sender_chat}")
+    print(f"[DEBUG] hasattr forward_origin = {hasattr(message, 'forward_origin')}")
+    
+    # ✅ FIX: Multi-method chat detection
     chat = None
 
-    # ✅ Method 1: New Telegram API — forward_origin (Pyrogram 2.x)
+    # Method 1: New Telegram API — forward_origin
     if hasattr(message, 'forward_origin') and message.forward_origin:
         origin = message.forward_origin
+        print(f"[DEBUG] forward_origin type = {type(origin)}, attrs = {dir(origin)}")
         if hasattr(origin, 'chat') and origin.chat:
-            chat = origin.chat  # MessageOriginChannel
+            chat = origin.chat
+            print(f"[DEBUG] Chat found via forward_origin.chat: {chat.id} - {chat.title}")
 
-    # ✅ Method 2: Classic forward_from_chat (older API)
-    if not chat:
-        chat = message.forward_from_chat
-
-    # ✅ Method 3: sender_chat (anonymous channel posts)
-    if not chat:
-        chat = message.sender_chat
-
-    # ✅ Method 4: Try fetching via linked_chat_id if all else fails  
+    # Method 2: Classic forward_from_chat
     if not chat and message.forward_from_chat:
+        chat = message.forward_from_chat
+        print(f"[DEBUG] Chat found via forward_from_chat: {chat.id} - {chat.title}")
+
+    # Method 3: sender_chat
+    if not chat and message.sender_chat:
+        chat = message.sender_chat
+        print(f"[DEBUG] Chat found via sender_chat: {chat.id} - {chat.title}")
+
+    # Method 4: Try get_chat on forward_origin chat id
+    if not chat and hasattr(message, 'forward_origin') and message.forward_origin:
         try:
-            chat = await client.get_chat(message.forward_from_chat.id)
-        except Exception:
-            pass
+            origin = message.forward_origin
+            if hasattr(origin, 'chat_id'):
+                chat = await client.get_chat(origin.chat_id)
+                print(f"[DEBUG] Chat found via get_chat(origin.chat_id): {chat.id}")
+        except Exception as e:
+            print(f"[DEBUG] Method 4 failed: {e}")
+
+    print(f"[DEBUG] Final chat resolved: {chat}")
 
     if not chat:
         await message.reply(
-            "❌ **Error:** Could not detect the source channel.\n\n"
+            "❌ **Could not detect source channel!**\n\n"
             "**Possible reasons:**\n"
-            "▪️ The channel has **forwarding privacy** enabled.\n"
-            "▪️ Try adding the bot directly to the channel as admin, then use /index again."
+            "▪️ Channel has **forwarding privacy** enabled\n"
+            "▪️ You forwarded from a **user/group** instead of a channel\n\n"
+            "**Solution:** Add the bot as admin to the channel first, then try /index again."
         )
         return message.stop_propagation()
 
     try:
         if chat.id in blacklisted_chats:
-            blacklisted_chats.remove(chat.id)
+            blacklisted_chats.discard(chat.id)
+            print(f"[DEBUG] Removed {chat.id} from blacklist")
 
         ani_type = detect_type(chat.title or "")
+        print(f"[DEBUG] Detected ani_type: {ani_type} for title: {chat.title}")
+        
         await kingdb.add_or_update_channel(
             channel_id=chat.id,
             title=chat.title or "Unknown Title",
@@ -257,6 +290,8 @@ async def index_forward(client, message):
             added_by=user_id
         )
         await kingdb.update_channel(chat.id, {"ani_type": ani_type})
+        
+        print(f"[DEBUG] ✅ Successfully indexed channel: {chat.id}")
 
         text, markup = get_index_panel_ui()
         await message.reply_photo(
@@ -279,6 +314,57 @@ async def index_forward(client, message):
         )
 
     except Exception as e:
+        print(f"[DEBUG] ❌ Exception during indexing: {e}")
         await message.reply(f"❌ **Error:** `{e}`")
 
     message.stop_propagation()
+
+
+# ================= 4. AUTO ADD ON BOT JOIN ================= #
+@Bot.on_chat_member_updated()
+async def auto_index_on_add(client, event: ChatMemberUpdated):
+    is_bot_added = False
+    
+    if event.new_chat_member and event.new_chat_member.user.is_self:
+        if event.new_chat_member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.ADMINISTRATOR]:
+            is_bot_added = True
+
+    if not is_bot_added:
+        return
+
+    chat = event.chat
+    if chat.type not in [enums.ChatType.CHANNEL, enums.ChatType.SUPERGROUP]:
+        return
+
+    if chat.id in blacklisted_chats:
+        return
+
+    adder_id = event.from_user.id
+    admins = await kingdb.get_all_admins()
+    
+    if adder_id != OWNER_ID and adder_id not in admins:
+        try: await client.leave_chat(chat.id)
+        except: pass
+        return
+
+    try:
+        ani_type = detect_type(chat.title or "")
+        await kingdb.add_or_update_channel(
+            channel_id=chat.id,
+            title=chat.title or "Unknown",
+            username=chat.username,
+            join_mode="direct",
+            expire_seconds=600,
+            added_by=adder_id
+        )
+        await kingdb.update_channel(chat.id, {"ani_type": ani_type})
+
+        await client.send_message(
+            LOG_CHANNEL,
+            f"🤖 **AUTO INDEXED (Bot Added By Admin)**\n\n📛 **Title:** {chat.title}\n"
+            f"🆔 **ID:** `{chat.id}`\n⚙️ **Type:** {ani_type.upper()}\n"
+            f"👤 **Added By:** {event.from_user.mention}\n⏰ **Time:** {get_time()}",
+            reply_markup=get_log_markup(chat.id)
+        )
+    except Exception as e:
+        print(f"Auto Index Error: {e}")
