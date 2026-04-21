@@ -451,5 +451,20 @@ class SidDataBase:
             "is_indexed": True,
             "$or": [{"title": regex}, {"username": regex}]
         }).to_list(length=None)
+        
+# In database.py / kingdb class
 
+async def set_user_state(self, user_id: int, state: str):
+    await self.user_states.update_one(
+        {"_id": user_id},
+        {"$set": {"state": state}},
+        upsert=True
+    )
+
+async def get_user_state(self, user_id: int):
+    doc = await self.user_states.find_one({"_id": user_id})
+    return doc.get("state") if doc else None
+
+async def clear_user_state(self, user_id: int):
+    await self.user_states.delete_one({"_id": user_id})
 kingdb = SidDataBase(DB_URI, DB_NAME)
