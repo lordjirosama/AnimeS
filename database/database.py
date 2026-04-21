@@ -28,19 +28,19 @@ class SidDataBase:
         self.group_data = self.database['groups']
         self.settings = self.database['settings']
         self.channels_col = self.database['saved_channels']
-        # ✈️ NEW COLLECTION EXCLUSIVELY FOR INDEXED MOVIE/ANIME CHANNELS
         self.indexed_channels_data = self.database['indexed_channels']
+        self.user_states = self.database['user_states']  # ✅ ADDED
+
     # CHANNEL BUTTON SETTINGS
     async def set_channel_button_link(self, button_name: str, button_link: str):
-        await self.channel_button_link_data.delete_many({})  # Remove all existing documents
-        await self.channel_button_link_data.insert_one({'button_name': button_name, 'button_link': button_link}) # Insert the new document
+        await self.channel_button_link_data.delete_many({})
+        await self.channel_button_link_data.insert_one({'button_name': button_name, 'button_link': button_link})
     
     async def get_channel_button_link(self):
         data = await self.channel_button_link_data.find_one({})
         if data:
             return data.get('button_name'), data.get('button_link')
         return 'Join Channel', 'https://t.me/btth480p'
-    
     
     # DELETE TIMER SETTINGS
     async def set_del_timer(self, value: int):        
@@ -56,8 +56,7 @@ class SidDataBase:
             return data.get('value', 600)
         return 600
     
-    # SET BOOLEAN VALUES FOR DIFFERENT SETTINGS
-
+    # SET BOOLEAN VALUES
     async def set_auto_delete(self, value: bool):
         existing = await self.auto_delete_data.find_one({})
         if existing:
@@ -93,9 +92,7 @@ class SidDataBase:
         else:
             await self.rqst_fsub_data.insert_one({'value': value})
 
-
-    # GET BOOLEAN VALUES FOR DIFFERENT SETTINGS        
-    
+    # GET BOOLEAN VALUES
     async def get_auto_delete(self):
         data = await self.auto_delete_data.find_one({})
         if data:
@@ -125,10 +122,9 @@ class SidDataBase:
         if data:
             return data.get('value', False)
         return False
-    
 
-    # USER MANAGEMNT
-    async def present_user(self, user_id : int):
+    # USER MANAGEMENT
+    async def present_user(self, user_id: int):
         found = await self.user_data.find_one({'_id': user_id})
         return bool(found)
     
@@ -141,7 +137,6 @@ class SidDataBase:
         user_ids = []
         for doc in user_docs:
             user_ids.append(doc['_id'])
-            
         return user_ids
     
     async def del_user(self, user_id: int):
@@ -168,7 +163,7 @@ class SidDataBase:
         channel_ids = [doc['_id'] for doc in channel_docs]
         return channel_ids
     
-    # ADMIN USER MANAGEMENT
+    # ADMIN MANAGEMENT
     async def admin_exist(self, admin_id: int):
         found = await self.admins_data.find_one({'_id': admin_id})
         return bool(found)
@@ -187,7 +182,6 @@ class SidDataBase:
         users_docs = await self.admins_data.find().to_list(length=None)
         user_ids = [doc['_id'] for doc in users_docs]
         return user_ids
-    
     
     # BAN USER MANAGEMENT
     async def ban_user_exist(self, user_id: int):
@@ -209,109 +203,80 @@ class SidDataBase:
         user_ids = [doc['_id'] for doc in users_docs]
         return user_ids
     
-    
     # REQUEST FORCE-SUB MANAGEMENT
-        
-    # Initialize a channel with an empty user_ids array (acting as a set)
     async def add_reqChannel(self, channel_id: int):
         await self.rqst_fsub_Channel_data.update_one(
             {'_id': channel_id}, 
-            {'$setOnInsert': {'user_ids': []}},  # Start with an empty array to represent the set
-            upsert=True  # Insert the document if it doesn't exist
+            {'$setOnInsert': {'user_ids': []}},
+            upsert=True
         )
 
-    # Method 1: Add user to the channel set
     async def reqSent_user(self, channel_id: int, user_id: int):
-        # Add the user to the set of users for a specific channel
         await self.rqst_fsub_Channel_data.update_one(
             {'_id': channel_id}, 
             {'$addToSet': {'user_ids': user_id}}, 
             upsert=True
         )
 
-    # Method 2: Remove a user from the channel set
     async def del_reqSent_user(self, channel_id: int, user_id: int):
-        # Remove the user from the set of users for the channel
         await self.rqst_fsub_Channel_data.update_one(
             {'_id': channel_id}, 
             {'$pull': {'user_ids': user_id}}
         )
         
-    # Clear the user set (user_ids array) for a specific channel
     async def clear_reqSent_user(self, channel_id: int):
         if await self.reqChannel_exist(channel_id):
             await self.rqst_fsub_Channel_data.update_one(
                 {'_id': channel_id}, 
-                {'$set': {'user_ids': []}}  # Reset user_ids to an empty array
+                {'$set': {'user_ids': []}}
             )
 
-    # Method 3: Check if a user exists in the channel set
     async def reqSent_user_exist(self, channel_id: int, user_id: int):
-        # Check if the user exists in the set of the channel's users
         found = await self.rqst_fsub_Channel_data.find_one(
             {'_id': channel_id, 'user_ids': user_id}
         )
         return bool(found)
 
-    # Method 4: Remove a channel and its set of users
     async def del_reqChannel(self, channel_id: int):
-        # Delete the entire channel's user set
         await self.rqst_fsub_Channel_data.delete_one({'_id': channel_id})
 
-    # Method 5: Check if a channel exists
     async def reqChannel_exist(self, channel_id: int):
-        # Check if the channel exists
         found = await self.rqst_fsub_Channel_data.find_one({'_id': channel_id})
         return bool(found)
 
-    # Method 6: Get all users from a channel's set
     async def get_reqSent_user(self, channel_id: int):
-        # Retrieve the list of users for a specific channel
         data = await self.rqst_fsub_Channel_data.find_one({'_id': channel_id})
         if data:
             return data.get('user_ids', [])
         return []
 
-    # Method 7: Get all available channel IDs
     async def get_reqChannel(self):
-        # Retrieve all channel IDs
         channel_docs = await self.rqst_fsub_Channel_data.find().to_list(length=None)
         channel_ids = [doc['_id'] for doc in channel_docs]
         return channel_ids
-        
 
-    # Get all available channel IDs in store_reqLink_data
     async def get_reqLink_channels(self):
-        # Retrieve all documents from store_reqLink_data
         channel_docs = await self.store_reqLink_data.find().to_list(length=None)
-        # Extract the channel IDs from the documents
         channel_ids = [doc['_id'] for doc in channel_docs]
         return channel_ids
 
-    # Get the stored link for a specific channel
     async def get_stored_reqLink(self, channel_id: int):
-        # Retrieve the stored link for a specific channel_id from store_reqLink_data
         data = await self.store_reqLink_data.find_one({'_id': channel_id})
         if data:
             return data.get('link')
         return None
 
-    # Set (or update) the stored link for a specific channel
     async def store_reqLink(self, channel_id: int, link: str):
-        # Insert or update the link for the channel_id in store_reqLink_data
         await self.store_reqLink_data.update_one(
             {'_id': channel_id}, 
             {'$set': {'link': link}}, 
             upsert=True
         )
 
-    # Delete the stored link and the channel from store_reqLink_data
     async def del_stored_reqLink(self, channel_id: int):
-        # Delete the document with the channel_id in store_reqLink_data
         await self.store_reqLink_data.delete_one({'_id': channel_id})
 
-    # ================= GROUP SYSTEM ================= #
-
+    # GROUP SYSTEM
     async def approve_group(self, chat_id: int):
         await self.group_data.update_one(
             {"_id": chat_id},
@@ -328,7 +293,6 @@ class SidDataBase:
 
     async def is_group_approved(self, chat_id: int):
         data = await self.group_data.find_one({"_id": chat_id})
-
         if not data:
             await self.group_data.insert_one({
                 "_id": chat_id,
@@ -336,11 +300,9 @@ class SidDataBase:
                 "search_mode": "auto"
             })
             return False
-
         return data.get("approved", False)
 
-    # ================= SEARCH MODE ================= #
-
+    # SEARCH MODE
     async def set_search_mode(self, chat_id: int, mode: str):
         await self.group_data.update_one(
             {"_id": chat_id},
@@ -350,7 +312,6 @@ class SidDataBase:
 
     async def get_search_mode(self, chat_id: int):
         data = await self.group_data.find_one({"_id": chat_id})
-
         if not data:
             await self.group_data.insert_one({
                 "_id": chat_id,
@@ -358,17 +319,12 @@ class SidDataBase:
                 "search_mode": "auto"
             })
             return "auto"
-
         return data.get("search_mode", "auto")
 
-    # ================= CHANNEL SYSTEM ================= #
-
+    # CHANNEL SYSTEM
     async def update_channel(self, channel_id: int, data: dict):
-
-        # expire -> expire_seconds convert
         if "expire" in data:
             data["expire_seconds"] = data.pop("expire")
-
         await self.indexed_channels_data.update_one(
             {"_id": channel_id},
             {"$set": data},
@@ -385,7 +341,6 @@ class SidDataBase:
 
     async def search_channel(self, keyword: str):
         regex = {"$regex": keyword, "$options": "i"}
-
         return await self.indexed_channels_data.find({
             "is_indexed": True,
             "$or": [
@@ -394,9 +349,7 @@ class SidDataBase:
             ]
         }).to_list(length=None)
 
-    
-# ================= CORRECTED INDEXING SYSTEM ================= #
-
+    # INDEXING SYSTEM
     async def add_or_update_channel(self, channel_id: int, title: str, username: str = None, join_mode: str = "direct", expire_seconds: int = 600, added_by: int = None):
         data = {
             "title": title,
@@ -406,19 +359,15 @@ class SidDataBase:
             "is_indexed": True,
             "updated_at": datetime.now()
         }
-        
-        # Ye line Error fix karegi
         if added_by:
             data["added_by"] = added_by
-
         await self.indexed_channels_data.update_one(
             {"_id": channel_id},
             {"$set": data},
             upsert=True
         )
 
-    # ================= FILE SHARE SAVE SYSTEM (Saved Channels) ================= #
-
+    # FILE SHARE SAVE SYSTEM
     async def add_save_channel(self, channel_id: int):
         await self.channels_col.update_one(
             {"_id": channel_id},
@@ -433,38 +382,36 @@ class SidDataBase:
         data = await self.channels_col.find().to_list(length=None)
         return [x["_id"] for x in data]
         
-    # Index se channel delete karne ke liye (Name changed to del_indexed_channel)
     async def del_indexed_channel(self, channel_id: int):
         await self.indexed_channels_data.delete_one({"_id": channel_id})
 
-    # Particular Join Mode ke liye
     async def update_channel_join_mode(self, channel_id, mode: str):
         await self.indexed_channels_data.update_one(
             {"_id": int(channel_id)},
             {"$set": {"join_mode": mode}}
         )
 
-    # Search fix
     async def search_channels(self, keyword: str):
         regex = {"$regex": keyword, "$options": "i"}
         return await self.indexed_channels_data.find({
             "is_indexed": True,
             "$or": [{"title": regex}, {"username": regex}]
         }).to_list(length=None)
-        
-# In database.py / kingdb class
 
-async def set_user_state(self, user_id: int, state: str):
-    await self.user_states.update_one(
-        {"_id": user_id},
-        {"$set": {"state": state}},
-        upsert=True
-    )
+    # ✅ USER STATE SYSTEM (Bot restart ke baad bhi kaam karega)
+    async def set_user_state(self, user_id: int, state: str):
+        await self.user_states.update_one(
+            {"_id": user_id},
+            {"$set": {"state": state}},
+            upsert=True
+        )
 
-async def get_user_state(self, user_id: int):
-    doc = await self.user_states.find_one({"_id": user_id})
-    return doc.get("state") if doc else None
+    async def get_user_state(self, user_id: int):
+        doc = await self.user_states.find_one({"_id": user_id})
+        return doc.get("state") if doc else None
 
-async def clear_user_state(self, user_id: int):
-    await self.user_states.delete_one({"_id": user_id})
+    async def clear_user_state(self, user_id: int):
+        await self.user_states.delete_one({"_id": user_id})
+
+
 kingdb = SidDataBase(DB_URI, DB_NAME)
