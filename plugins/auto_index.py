@@ -201,8 +201,7 @@ async def index_callbacks(client, query):
         
         await kingdb.update_channel(chat_id, {"ani_type": new_type})
         await query.answer(f"✅ Category updated to {new_type.upper()}!", show_alert=True)
-
-
+        
 # ================= 3. FORWARD HANDLER (MANUAL ADD) ================= #
 @Bot.on_message(filters.private & filters.forwarded, group=-1)
 async def index_forward(client, message):
@@ -210,10 +209,38 @@ async def index_forward(client, message):
     if user_id not in index_wait: return
     
     index_wait.remove(user_id)
-    chat = message.forward_from_chat or message.sender_chat
+    
+    # --- FIX: Handle all Telegram forward types ---
+    chat = None
+
+    # ✅ Method 1: New Telegram API — forward_origin (Pyrogram 2.x)
+    if hasattr(message, 'forward_origin') and message.forward_origin:
+        origin = message.forward_origin
+        if hasattr(origin, 'chat') and origin.chat:
+            chat = origin.chat  # MessageOriginChannel
+
+    # ✅ Method 2: Classic forward_from_chat (older API)
+    if not chat:
+        chat = message.forward_from_chat
+
+    # ✅ Method 3: sender_chat (anonymous channel posts)
+    if not chat:
+        chat = message.sender_chat
+
+    # ✅ Method 4: Try fetching via linked_chat_id if all else fails  
+    if not chat and message.forward_from_chat:
+        try:
+            chat = await client.get_chat(message.forward_from_chat.id)
+        except Exception:
+            pass
 
     if not chat:
-        await message.reply("❌ **Error:** Please forward from a valid Channel or Group.")
+        await message.reply(
+            "❌ **Error:** Could not detect the source channel.\n\n"
+            "**Possible reasons:**\n"
+            "▪️ The channel has **forwarding privacy** enabled.\n"
+            "▪️ Try adding the bot directly to the channel as admin, then use /index again."
+        )
         return message.stop_propagation()
 
     try:
@@ -224,7 +251,7 @@ async def index_forward(client, message):
         await kingdb.add_or_update_channel(
             channel_id=chat.id,
             title=chat.title or "Unknown Title",
-            username=chat.username,
+            username=getattr(chat, 'username', None),
             join_mode="direct",
             expire_seconds=600,
             added_by=user_id
@@ -252,58 +279,6 @@ async def index_forward(client, message):
         )
 
     except Exception as e:
-        await message.reply(f"❌ **Error:** {e}")
+        await message.reply(f"❌ **Error:** `{e}`")
 
     message.stop_propagation()
-
-# ================= 4. AUTO ADD ON BOT JOIN ================= #
-@Bot.on_chat_member_updated()
-async def auto_index_on_add(client, event: ChatMemberUpdated):
-    is_bot_added = False
-    
-    # Check if the member being updated is the bot itself
-    if event.new_chat_member and event.new_chat_member.user.is_self:
-        if event.new_chat_member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.ADMINISTRATOR]:
-            is_bot_added = True
-
-    if not is_bot_added:
-        return
-
-    chat = event.chat
-    if chat.type not in [enums.ChatType.CHANNEL, enums.ChatType.SUPERGROUP]:
-        return
-
-    # Check Blacklist
-    if chat.id in blacklisted_chats:
-        return
-
-    adder_id = event.from_user.id
-    admins = await kingdb.get_all_admins()
-    
-    if adder_id != OWNER_ID and adder_id not in admins:
-        try: await client.leave_chat(chat.id)
-        except: pass
-        return
-
-    try:
-        ani_type = detect_type(chat.title or "")
-        await kingdb.add_or_update_channel(
-            channel_id=chat.id,
-            title=chat.title or "Unknown",
-            username=chat.username,
-            join_mode="direct",
-            expire_seconds=600,
-            added_by=adder_id
-        )
-        await kingdb.update_channel(chat.id, {"ani_type": ani_type})
-
-        await client.send_message(
-            LOG_CHANNEL,
-            f"🤖 **AUTO INDEXED (Bot Added By Admin)**\n\n📛 **Title:** {chat.title}\n"
-            f"🆔 **ID:** `{chat.id}`\n⚙️ **Type:** {ani_type.upper()}\n"
-            f"👤 **Added By:** {event.from_user.mention}\n⏰ **Time:** {get_time()}",
-            reply_markup=get_log_markup(chat.id)
-        )
-    except Exception as e:
-        print(f"Auto Index Error: {e}")
-        
