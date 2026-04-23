@@ -192,9 +192,20 @@ def build_details_caption(ani_data, clean_title):
         ani_format = ani_data.get('format', 'Unknown')
         status = ani_data.get('status', 'Unknown')
         year = ani_data.get('seasonYear', 'N/A')
-        rating = ani_data.get("averageScore") or "N/A"
-        season = ani_data.get("season") or "N/A"
+
+        # ✅ FIXED RATING
+        rating = ani_data.get("averageScore")
+        if rating is None:
+            rating_text = "N/A"
+        else:
+            rating_text = f"{rating}%"
+
+        # ✅ BETTER SEASON TEXT
+        season = ani_data.get("season")
+        season_text = f"{season} {year}" if season and year else "N/A"
+
         genres = ", ".join(ani_data.get('genres', [])[:3]) if ani_data.get('genres') else "N/A"
+
         eps_chaps = (
             f"⋟ Chapters: {ani_data.get('chapters', 'N/A')}"
             if ani_data.get('type') == "MANGA"
@@ -206,22 +217,23 @@ def build_details_caption(ani_data, clean_title):
 
         if len(synopsis) > 300:
             synopsis = synopsis[:300] + "..."
+
         poster = f"https://img.anili.st/media/{ani_data.get('id')}" if ani_data.get('id') else random.choice(PICS)
 
         caption = (
             f"〈 {ani_title} 〉\n\n"
-            f"🌟{rating}% ⌯ {ani_format} ⍀ {genres}\n"
-            f"⋟ Season: {season}\n"
+            f"🌟{rating_text} ⌯ {ani_format} ⍀ {genres}\n"
+            f"⋟ Season: {season_text}\n"
             f"{eps_chaps}\n"
-            f"⋟ Year: {year}\n"
             f"⋟ Status: {status}\n"
             f"⋟ Quality: 480p, 720p, 1080p\n"
-            f"⋟ Synopsis: {synopsis}"
+            f"⋟ Synopsis: {synopsis}\n\n"
         )
+
         return poster, caption
+
     else:
         return random.choice(PICS), f"<blockquote><b>{clean_title}</b></blockquote>\n\n✦ <b>Status:</b> Found in Database ✅\n\n"
-        
 
 #-------
 
