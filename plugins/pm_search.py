@@ -218,7 +218,7 @@ def build_details_caption(ani_data, clean_title):
             f"⋟ Quality: 480p, 720p, 1080p\n"
             f"⋟ Synopsis: {synopsis}"
         )
-        return poster, caption
+        return poster, #caption
     else:
         return random.choice(PICS), f"<blockquote><b>{clean_title}</b></blockquote>\n\n✦ <b>Status:</b> Found in Database ✅\n\n"
         
@@ -247,7 +247,7 @@ async def dbch_details(client, query):
     else: link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
     poster, caption = build_details_caption(ani_data, clean_title)
-    caption += "<b>Please click the button below to access your files.</b>"
+  #  caption += "<b>Please click the button below to access your files.</b>"
     btn = [
         [InlineKeyboardButton(f"🎥🍿 {clean_title[:15]}", url=link.invite_link)],
         [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")]
