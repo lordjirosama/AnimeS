@@ -201,14 +201,14 @@ def build_details_caption_group(ani_data, clean_title):
         poster = f"https://img.anili.st/media/{ani_data.get('id')}" if ani_data.get('id') else random.choice(PICS)
 
         caption = (
-            f"<blockquote>**{ani_title}**</blockquote>\n\n"
-            f"✦ **Type:** {ani_format}   |   **Status:** {status}\n"
-            f"{eps_chaps}   |   **Year:** {year}\n"
-            f"✦ **Genres:** {genres}\n"
-            f"✦ **Synopsis:** {synopsis}\n\n"
+            f"<blockquote><b>{ani_title}</b></blockquote>\n\n"
+            f"✦ <b>Type:</b> {ani_format}   |   <b>Status:</b> {status}\n"
+            f"{eps_chaps}   |   <b>Year:</b> {year}\n"
+            f"✦ <b>Genres:</b> {genres}\n"
+            f"✦ <b>Synopsis:</b> {synopsis}\n\n"
         )
         return poster, caption
-    else: return random.choice(PICS), f"<blockquote>**{clean_title}**</blockquote>\n\n✦ **Status:** Found in Database ✅\n\n"
+    else: return random.choice(PICS), f"<blockquote>{clean_title}</blockquote>\n\n✦ Status: Found in Database ✅\n\n"
 
 @Bot.on_callback_query(filters.regex(r"^grp_dbch_(-?\d+)_(.*)_(.*)$"), group=-1)
 async def grp_dbch_details(client, query):
@@ -237,7 +237,7 @@ async def grp_dbch_details(client, query):
     poster, caption = build_details_caption_group(ani_data, clean_title)
     caption += "👇 **Please click the button below to access your files:**\n⏳ _This message will be deleted shortly._"
     btn = [
-        [InlineKeyboardButton(f"🎬 Access: {clean_title[:15]}", url=link.invite_link)],
+        [InlineKeyboardButton(f"🎥🍿 {clean_title[:15]}", url=link.invite_link)],
         [InlineKeyboardButton("🔙 Back", callback_data=f"grp_bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="grp_close_panel")]
     ]
     await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
@@ -264,9 +264,9 @@ async def grp_aclk_details(client, query):
         if join_mode == "request": link = await client.create_chat_invite_link(ch['_id'], creates_join_request=True, expire_date=expire_date)
         else: link = await client.create_chat_invite_link(ch['_id'], expire_date=expire_date)
         caption += "👇 **Please click the button below to access your files:**\n⏳ _This message will be deleted shortly._"
-        btn.append([InlineKeyboardButton(f"🎬 Access: {title[:15]}", url=link.invite_link)])
+        btn.append([InlineKeyboardButton(f"🎥🍿 {title[:15]}", url=link.invite_link)])
     else:
-        caption += "⚠️ **Status:** __Not available in Database.__\n👇 Click the button below to request an upload!\n⏳ _This message will be deleted shortly._"
+        caption += "<b>⚠️ Status: Not available in Database \n👇 Click the button below to request to upload!</b>"
         btn.append([InlineKeyboardButton("📥 Request Upload", callback_data=f"grp_req_{ani_id}")])
 
     btn.append([InlineKeyboardButton("🔙 Back", callback_data=f"grp_bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="grp_close_panel")])
