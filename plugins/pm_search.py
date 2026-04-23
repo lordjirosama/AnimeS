@@ -253,9 +253,19 @@ async def dbch_details(client, query):
         [InlineKeyboardButton(f"🎥🍿 {clean_title[:15]}", url=link.invite_link)],
         [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")]
     ]
-    await query.message.edit_media(media=InputMediaPhoto(media=poster, reply_markup=InlineKeyboardMarkup(btn))
-#    await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
-    
+    if poster:
+         await query.message.edit_media(
+             media=InputMediaPhoto(
+                 media=poster,
+                caption=caption
+        ),
+        reply_markup=InlineKeyboardMarkup(btn)
+    )
+else:
+    await query.message.edit_text(
+        text=caption,
+        reply_markup=InlineKeyboardMarkup(btn)
+    )
 @Bot.on_callback_query(filters.regex(r"^aclk_(\d+)_(.*)_(.*)$"), group=-1)
 async def aclk_details(client, query):
     ani_id, req_type, sq = int(query.matches[0].group(1)), query.matches[0].group(2), query.matches[0].group(3)
