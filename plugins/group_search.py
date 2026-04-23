@@ -77,7 +77,8 @@ async def check_fsub_group_warn(client, message, user_id, is_callback=False, que
             sent = await message.reply_photo(
                 photo=random.choice(PICS),
                 caption=caption,
-                reply_markup=InlineKeyboardMarkup(buttons)
+                reply_markup=InlineKeyboardMarkup(buttons),
+                parse_mode="html"
             )
             await asyncio.sleep(45)
             try:
@@ -88,7 +89,7 @@ async def check_fsub_group_warn(client, message, user_id, is_callback=False, que
     return True
 
 def clean_title_for_anilist(title):
-    title = re.sub(r'.*?|.*?', '', title)
+    title = re.sub(r'\[.*?\]|\(.*?\)', '', title)
     title = re.sub(r'(?i)(hindi|dubbed|dub|subbed|sub|dual|audio|multi|1080p|720p|480p|hevc|x264|x265|blu-ray|bluray|web-dl|webrip|season\s*\d+|s\d+)', '', title)
     return title.split('|')[0].split('-')[0].strip().title()
 
@@ -188,7 +189,7 @@ async def perform_search_list_group(client, message, query, req_type="ALL", is_c
 
     if is_callback:
         await message.edit_media(
-            media=InputMediaPhoto(media=random.choice(PICS), caption=caption, parse_mode="html"),
+            media=InputMediaPhoto(media=random.choice(PICS), caption=caption),
             reply_markup=InlineKeyboardMarkup(buttons)
         )
     else:
