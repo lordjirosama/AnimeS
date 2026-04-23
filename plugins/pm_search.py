@@ -212,7 +212,7 @@ def build_details_caption(ani_data, clean_title):
             f"〈 {ani_title} 〉\n\n"
             f"🌟{rating}% ⌯ {ani_format} ⍀ {genres}\n"
             f"⋟ Season: {season}\n"
-            f"⋟ Episodes: {episodes}\n"
+            f"{episodes}\n"
             f"⋟ Year: {year}\n"
             f"⋟ Status: {status}\n"
             f"⋟ Quality: 480p, 720p, 1080p\n"
