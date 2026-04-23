@@ -254,18 +254,37 @@ async def dbch_details(client, query):
         [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")]
     ]
     if poster:
-         await query.message.edit_media(
-             media=InputMediaPhoto(
-                 media=poster,
-              #  caption=caption
-        ),
+    try:
+        # Agar poster tuple hai (photo, caption)
+        if isinstance(poster, tuple):
+            photo = poster[0]
+            cap = poster[1] if len(poster) > 1 else caption
+        else:
+            photo = poster
+            cap = caption
+
+        await query.message.edit_media(
+            media=InputMediaPhoto(
+                media=photo,
+                caption=cap
+            ),
+            reply_markup=InlineKeyboardMarkup(btn)
+        )
+
+    except Exception as e:
+        print("EDIT_MEDIA ERROR:", e)
+
+        # fallback agar media edit fail ho jaye
+        await query.message.edit_text(
+            text=caption,
+            reply_markup=InlineKeyboardMarkup(btn)
+        )
+
+else:
+    await query.message.edit_text(
+        text=caption,
         reply_markup=InlineKeyboardMarkup(btn)
-    )
-    else:
-         await query.message.edit_text(
-             text=caption,
-             reply_markup=InlineKeyboardMarkup(btn)
-    )
+        )
         
 @Bot.on_callback_query(filters.regex(r"^aclk_(\d+)_(.*)_(.*)$"), group=-1)
 async def aclk_details(client, query):
