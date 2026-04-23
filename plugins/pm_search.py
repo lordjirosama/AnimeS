@@ -186,31 +186,27 @@ async def try_again_cb(client, query):
     sq = query.matches[0].group(2)
     await perform_search_list(client, query.message, sq, req_type, True, False, query.from_user.id)
 
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 def build_details_caption(ani_data, clean_title):
     if ani_data:
         ani_title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or clean_title
         ani_format = ani_data.get('format', 'Unknown')
         status = ani_data.get('status', 'Unknown')
-        year = ani_data.get('seasonYear', 'N/A')
 
-        # ✅ FIXED RATING
+        # ✅ rating fix
         rating = ani_data.get("averageScore")
-        if rating is None:
-            rating_text = "N/A"
-        else:
-            rating_text = f"{rating}%"
+        rating_text = f"{rating}%" if rating else "N/A"
 
-        # ✅ BETTER SEASON TEXT
+        # ✅ season fix
         season = ani_data.get("season")
+        year = ani_data.get("seasonYear")
         season_text = f"{season} {year}" if season and year else "N/A"
 
-        genres = ", ".join(ani_data.get('genres', [])[:3]) if ani_data.get('genres') else "N/A"
+        # ✅ episodes fix
+        eps = ani_data.get("episodes")
+        episodes = eps if eps else "Ongoing"
 
-        eps_chaps = (
-            f"⋟ Chapters: {ani_data.get('chapters', 'N/A')}"
-            if ani_data.get('type') == "MANGA"
-            else f"⋟ Episodes: {ani_data.get('episodes', 'N/A')}"
-        )
+        genres = ", ".join(ani_data.get('genres', [])[:3]) if ani_data.get('genres') else "N/A"
 
         synopsis = str(ani_data.get('description', 'No synopsis available.')) \
             .replace("<br>", "").replace("<i>", "").replace("</i>", "")
@@ -218,24 +214,23 @@ def build_details_caption(ani_data, clean_title):
         if len(synopsis) > 300:
             synopsis = synopsis[:300] + "..."
 
-        poster = f"https://img.anili.st/media/{ani_data.get('id')}" if ani_data.get('id') else random.choice(PICS)
+        poster = f"https://img.anili.st/media/{ani_data.get('id')}"
 
         caption = (
             f"〈 {ani_title} 〉\n\n"
             f"🌟{rating_text} ⌯ {ani_format} ⍀ {genres}\n"
             f"⋟ Season: {season_text}\n"
-            f"{eps_chaps}\n"
+            f"⋟ Episodes: {episodes}\n"
             f"⋟ Status: {status}\n"
             f"⋟ Quality: 480p, 720p, 1080p\n"
-            f"⋟ Synopsis: {synopsis}\n\n"
+            f"⋟ Synopsis: {synopsis}"
         )
 
         return poster, caption
 
     else:
-        return random.choice(PICS), f"<blockquote><b>{clean_title}</b></blockquote>\n\n✦ <b>Status:</b> Found in Database ✅\n\n"
-
-#-------
+        return None, f"<b>{clean_title}</b>\n\nStatus: Found in Database ✅"
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
