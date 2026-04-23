@@ -290,9 +290,9 @@ async def dbch_details(client, query):
     else: link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
     poster, caption = build_details_caption(ani_data, clean_title)
-    caption += "👇 **Please click the button below to access your files:**"
+    caption += "Please click the button below to access your channel"
     btn = [
-        [InlineKeyboardButton(f"🎥🍿: {clean_title[:15]}", url=link.invite_link)],
+        [InlineKeyboardButton(f"🎥🍿{clean_title[:15]}", url=link.invite_link)],
         [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")]
     ]
     await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
@@ -318,10 +318,10 @@ async def aclk_details(client, query):
         expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
         if join_mode == "request": link = await client.create_chat_invite_link(ch['_id'], creates_join_request=True, expire_date=expire_date)
         else: link = await client.create_chat_invite_link(ch['_id'], expire_date=expire_date)
-        caption += "👇 **Please click the button below to access your files:**"
-        btn.append([InlineKeyboardButton(f"🎥🍿: {title[:15]}", url=link.invite_link)])
+        caption += "Please click the button below to access your files:**"
+        btn.append([InlineKeyboardButton(f"🎥🍿{title[:15]}", url=link.invite_link)])
     else:
-        caption += "⚠️ **Status:** __Not available in Database.__\n👇 Click the button below to request an upload!"
+        caption += "⚠️ Status: Channel Not available.\nClick the button below to request an upload!👇🏻"
         btn.append([InlineKeyboardButton("ʀᴇǫᴜᴇꜱᴛ ᴛᴏ ᴜᴘʟᴏᴀᴅ", callback_data=f"req_{ani_id}")])
 
     btn.append([InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")])
@@ -335,7 +335,7 @@ async def request_upload(client, query):
     
     await client.send_message(
         LOG_CHANNEL, 
-        f"📥 NEW UPLOAD REQUEST**\n\n👤 User: {query.from_user.mention} (`{query.from_user.id}`)\n🎬 Title: {title}\n🔗 Anilist: https://anilist.co/anime/{ani_id}"
+        f"📥 NEW UPLOAD REQUEST\n\n👤 User: {query.from_user.mention} (`{query.from_user.id}`)\n🎬 Title: {title}\n🔗 Anilist: https://anilist.co/anime/{ani_id}"
     )
     await query.answer("✅ Request Sent to Admins! Hum jaldi upload karenge.", show_alert=True)
 
