@@ -245,8 +245,9 @@ async def dbch_details(client, query):
     expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
     if join_mode == "request": link = await client.create_chat_invite_link(ch_id, creates_join_request=True, expire_date=expire_date)
     else: link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
-
-    poster, caption = build_details_caption(ani_data, clean_title)
+    poster = build_details_caption(ani_data, clean_title)
+  #  caption
+   # poster, caption = build_details_caption(ani_data, clean_title)
   #  caption += "<b>Please click the button below to access your files.</b>"
     btn = [
         [InlineKeyboardButton(f"🎥🍿 {clean_title[:15]}", url=link.invite_link)],
