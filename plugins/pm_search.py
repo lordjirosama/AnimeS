@@ -237,7 +237,7 @@ async def dbch_details(client, query):
     poster, caption = build_details_caption(ani_data, clean_title)
     caption += "<b>Please click the button below to access your files.</b>"
     btn = [
-        [InlineKeyboardButton(f"🎬 Access: {clean_title[:15]}", url=link.invite_link)],
+        [InlineKeyboardButton(f"🎥🍿 {clean_title[:15]}", url=link.invite_link)],
         [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")]
     ]
     await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
@@ -264,7 +264,7 @@ async def aclk_details(client, query):
         if join_mode == "request": link = await client.create_chat_invite_link(ch['_id'], creates_join_request=True, expire_date=expire_date)
         else: link = await client.create_chat_invite_link(ch['_id'], expire_date=expire_date)
         caption += "<b>Please click the button below to access your files</b>"
-        btn.append([InlineKeyboardButton(f"🎬 Access: {title[:15]}", url=link.invite_link)])
+        btn.append([InlineKeyboardButton(f"🎥🍿 {title[:15]}", url=link.invite_link)])
     else:
         caption += "<b>⚠️ Status: Not available in Database \n👇 Click the button below to request to upload!</b>"
         btn.append([InlineKeyboardButton("ʀᴇǫᴜᴇꜱᴛ ᴜᴘʟᴏᴀᴅ", callback_data=f"req_{ani_id}")])
