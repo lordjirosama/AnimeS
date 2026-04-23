@@ -263,7 +263,7 @@ async def grp_aclk_details(client, query):
         expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
         if join_mode == "request": link = await client.create_chat_invite_link(ch['_id'], creates_join_request=True, expire_date=expire_date)
         else: link = await client.create_chat_invite_link(ch['_id'], expire_date=expire_date)
-        caption += "👇 Please click the button below to access your files:\n⏳ _This message will be deleted shortly._"
+        caption += "👇 Please click the button below to access your channel:\n⏳ _This message will be deleted shortly._"
         btn.append([InlineKeyboardButton(f"🎥🍿 {title[:15]}", url=link.invite_link)])
     else:
         caption += "<b>⚠️ Status: Not available in Database \n👇 Click the button below to request to upload!</b>"
