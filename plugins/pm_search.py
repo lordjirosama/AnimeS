@@ -225,65 +225,79 @@ def build_details_caption(ani_data, clean_title):
 @Bot.on_callback_query(filters.regex(r"^dbch_(-?\d+)_(.*)_(.*)$"), group=-1)
 async def dbch_details(client, query):
     ch_id, req_type, sq = int(query.matches[0].group(1)), query.matches[0].group(2), query.matches[0].group(3)
-    if not await check_fsub_and_warn(client, query.message, query.from_user.id, True, sq, req_type): return
-    
+
+    if not await check_fsub_and_warn(client, query.message, query.from_user.id, True, sq, req_type):
+        return
+
     ch = await kingdb.get_channel(ch_id)
-    if not ch: return await query.answer("❌ Not available.", show_alert=True)
+    if not ch:
+        return await query.answer("❌ Not available.", show_alert=True)
+
     await query.answer("Fetching Details... ⏳")
-        
+
     raw_title = ch.get("title", "Unknown")
     clean_title = clean_title_for_anilist(raw_title)
-    
+
     ani_data = None
-    if ch.get("ani_id"): ani_data = await fast_anilist_fetch_by_id(ch.get("ani_id"))
-    if not ani_data: 
+    if ch.get("ani_id"):
+        ani_data = await fast_anilist_fetch_by_id(ch.get("ani_id"))
+
+    if not ani_data:
         search_results = await fast_anilist_search(clean_title, req_type)
-        if search_results and 'id' in search_results[0]: ani_data = await fast_anilist_fetch_by_id(search_results[0]['id']) 
-        else: ani_data = {}
-
-    join_mode, expire_seconds = ch.get("join_mode", "direct"), ch.get("expire_seconds", 0)
-    expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
-    if join_mode == "request": link = await client.create_chat_invite_link(ch_id, creates_join_request=True, expire_date=expire_date)
-    else: link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
-    poster = build_details_caption(ani_data, clean_title)
-  #  caption
-   # poster, caption = build_details_caption(ani_data, clean_title)
-  #  caption += "<b>Please click the button below to access your files.</b>"
-    btn = [
-        [InlineKeyboardButton(f"🎥🍿 {clean_title[:15]}", url=link.invite_link)],
-        [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")]
-    ]
-    if poster:
-    try:
-        # Agar poster tuple hai (photo, caption)
-        if isinstance(poster, tuple):
-            photo = poster[0]
-            cap = poster[1] if len(poster) > 1 else caption
+        if search_results and 'id' in search_results[0]:
+            ani_data = await fast_anilist_fetch_by_id(search_results[0]['id'])
         else:
-            photo = poster
-            cap = caption
+            ani_data = {}
 
-        await query.message.edit_media(
-            media=InputMediaPhoto(
-                media=photo,
-                caption=cap
-            ),
-            reply_markup=InlineKeyboardMarkup(btn)
+    join_mode = ch.get("join_mode", "direct")
+    expire_seconds = ch.get("expire_seconds", 0)
+    expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
+
+    if join_mode == "request":
+        link = await client.create_chat_invite_link(
+            ch_id, creates_join_request=True, expire_date=expire_date
+        )
+    else:
+        link = await client.create_chat_invite_link(
+            ch_id, expire_date=expire_date
         )
 
-    except Exception as e:
-        print("EDIT_MEDIA ERROR:", e)
+    # ✅ FIX: yaha properly unpack karo
+    poster, caption = build_details_caption(ani_data, clean_title)
 
-        # fallback agar media edit fail ho jaye
+    caption += "\n\n<b>Please click the button below to access your files.</b>"
+
+    btn = [
+        [InlineKeyboardButton(f"🎥🍿 {clean_title[:15]}", url=link.invite_link)],
+        [
+            InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"bck_{sq}"),
+            InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="close_panel")
+        ]
+    ]
+
+    # ✅ FIXED BLOCK
+    if poster:
+        try:
+            await query.message.edit_media(
+                media=InputMediaPhoto(
+                    media=poster,
+                    caption=caption
+                ),
+                reply_markup=InlineKeyboardMarkup(btn)
+            )
+
+        except Exception as e:
+            print("EDIT_MEDIA ERROR:", e)
+
+            await query.message.edit_text(
+                text=caption,
+                reply_markup=InlineKeyboardMarkup(btn)
+            )
+
+    else:
         await query.message.edit_text(
             text=caption,
             reply_markup=InlineKeyboardMarkup(btn)
-        )
-
-else:
-    await query.message.edit_text(
-        text=caption,
-        reply_markup=InlineKeyboardMarkup(btn)
         )
         
 @Bot.on_callback_query(filters.regex(r"^aclk_(\d+)_(.*)_(.*)$"), group=-1)
