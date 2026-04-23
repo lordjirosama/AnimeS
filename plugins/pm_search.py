@@ -93,13 +93,44 @@ async def fast_anilist_search(query, req_type="ALL"):
         except Exception: return []
 
 async def fast_anilist_fetch_by_id(ani_id):
-    graphql = """query ($id: Int) { Media (id: $id) { id title { english romaji } type format status episodes chapters seasonYear genres description(asHtml: false) } }"""
+    graphql = """
+    query ($id: Int) { 
+        Media (id: $id) { 
+            id
+            title { english romaji }
+            type
+            format
+            status
+            episodes
+            chapters
+            seasonYear
+            season
+            genres
+            averageScore
+            description(asHtml: false)
+        } 
+    }
+    """
+
     async with aiohttp.ClientSession() as sess:
         try:
-            async with sess.post("https://graphql.anilist.co", json={'query': graphql, 'variables': {'id': ani_id}}, timeout=3) as resp:
+            async with sess.post(
+                "https://graphql.anilist.co",
+                json={'query': graphql, 'variables': {'id': ani_id}},
+                timeout=5
+            ) as resp:
+
                 data = await resp.json()
+
+                # ✅ DEBUG (optional but useful)
+                print("\n===== ANILIST FETCH BY ID =====")
+                print(data)
+
                 return data.get('data', {}).get('Media') or {}
-        except Exception: return {}
+
+        except Exception as e:
+            print("❌ ERROR:", e)
+            return {}
 
 # ✈️ MAIN SEARCH GENERATOR
 async def perform_search_list(client, message, query, req_type="ALL", is_callback=False, is_auto=False, cb_user_id=None):
