@@ -218,7 +218,7 @@ def build_details_caption(ani_data, clean_title):
             f"⋟ Quality: 480p, 720p, 1080p\n"
             f"⋟ Synopsis: {synopsis}"
         )
-        return poster, #caption
+        return poster, caption
     else:
         return random.choice(PICS), f"<blockquote><b>{clean_title}</b></blockquote>\n\n✦ <b>Status:</b> Found in Database ✅\n\n"
         
