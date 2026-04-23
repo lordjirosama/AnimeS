@@ -148,7 +148,7 @@ async def perform_search_list_group(client, message, query, req_type="ALL", is_c
             added_titles.add(title.lower())
             buttons.append([InlineKeyboardButton(title[:30], callback_data=f"grp_aclk_{media['id']}_{req_type}_{short_query}")])
 
-    buttons.append([InlineKeyboardButton("✖️ Close", callback_data="grp_close_panel")])
+    buttons.append([InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="grp_close_panel")])
     caption = f"🔍 **Search results for:** `{query}`\n\n👇 **Select an option below:**\n⏳ _This message will be deleted in {AUTO_DELETE_TIME // 60} minutes._"
     
     if is_callback: await message.edit_media(media=InputMediaPhoto(media=random.choice(PICS), caption=caption), reply_markup=InlineKeyboardMarkup(buttons))
@@ -238,7 +238,7 @@ async def grp_dbch_details(client, query):
     caption += "👇 **Please click the button below to access your files:**\n⏳ _This message will be deleted shortly._"
     btn = [
         [InlineKeyboardButton(f"🎥🍿 {clean_title[:15]}", url=link.invite_link)],
-        [InlineKeyboardButton("🔙 Back", callback_data=f"grp_bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="grp_close_panel")]
+        [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"grp_bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="grp_close_panel")]
     ]
     await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
 
@@ -263,13 +263,13 @@ async def grp_aclk_details(client, query):
         expire_date = datetime.now() + timedelta(seconds=expire_seconds) if expire_seconds > 0 else None
         if join_mode == "request": link = await client.create_chat_invite_link(ch['_id'], creates_join_request=True, expire_date=expire_date)
         else: link = await client.create_chat_invite_link(ch['_id'], expire_date=expire_date)
-        caption += "👇 **Please click the button below to access your files:**\n⏳ _This message will be deleted shortly._"
+        caption += "👇 Please click the button below to access your files:\n⏳ _This message will be deleted shortly._"
         btn.append([InlineKeyboardButton(f"🎥🍿 {title[:15]}", url=link.invite_link)])
     else:
         caption += "<b>⚠️ Status: Not available in Database \n👇 Click the button below to request to upload!</b>"
-        btn.append([InlineKeyboardButton("📥 Request Upload", callback_data=f"grp_req_{ani_id}")])
+        btn.append([InlineKeyboardButton("ʀᴇǫᴜᴇꜱᴛ ᴜᴘʟᴏᴀᴅ", callback_data=f"grp_req_{ani_id}")])
 
-    btn.append([InlineKeyboardButton("🔙 Back", callback_data=f"grp_bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="grp_close_panel")])
+    btn.append([InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"grp_bck_{sq}"), InlineKeyboardButton("✖️ Close", callback_data="grp_close_panel")])
     await query.message.edit_media(media=InputMediaPhoto(media=poster, caption=caption), reply_markup=InlineKeyboardMarkup(btn))
 
 @Bot.on_callback_query(filters.regex(r"^grp_req_(\d+)$"), group=-1)
