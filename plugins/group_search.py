@@ -11,7 +11,7 @@ from helper_func import is_userJoin
 from config import OWNER_ID, PICS, LOG_CHANNEL
 from plugins.FORMATS import FORCE_MSG 
 
-AUTO_DELETE_TIME = 300 
+AUTO_DELETE_TIME = 5
 
 def is_exact_match(query, title):
     if not title: return False
