@@ -192,11 +192,20 @@ def build_details_caption(ani_data, clean_title):
         ani_format = ani_data.get('format', 'Unknown')
         status = ani_data.get('status', 'Unknown')
         year = ani_data.get('seasonYear', 'N/A')
+        rating = ani_data.get("averageScore") or "N/A"
+        season = ani_data.get("season") or "N/A"
         genres = ", ".join(ani_data.get('genres', [])[:3]) if ani_data.get('genres') else "N/A"
-        eps_chaps = f"✦ <b>Chapters:</b> {ani_data.get('chapters', 'N/A')}" if ani_data.get('type') == "MANGA" else f"✦ <b>Episodes:</b> {ani_data.get('episodes', 'N/A')}"
-        synopsis = str(ani_data.get('description', 'No synopsis available.')).replace("<br>", "").replace("<i>", "").replace("</i>", "")
-        if len(synopsis) > 200:
-            synopsis = synopsis[:200] + "..."
+        eps_chaps = (
+            f"⋟ Chapters: {ani_data.get('chapters', 'N/A')}"
+            if ani_data.get('type') == "MANGA"
+            else f"⋟ Episodes: {ani_data.get('episodes', 'N/A')}"
+        )
+
+        synopsis = str(ani_data.get('description', 'No synopsis available.')) \
+            .replace("<br>", "").replace("<i>", "").replace("</i>", "")
+
+        if len(synopsis) > 500:
+            synopsis = synopsis[:500] + "..."
         poster = f"https://img.anili.st/media/{ani_data.get('id')}" if ani_data.get('id') else random.choice(PICS)
 
         caption = (
