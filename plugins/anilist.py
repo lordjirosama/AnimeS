@@ -15,6 +15,7 @@ query ($search: String, $type: MediaType) {
     episodes
     chapters
     seasonYear
+    season
     genres
     averageScore
     description(asHtml: false)
