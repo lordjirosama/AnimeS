@@ -200,11 +200,15 @@ def build_details_caption(ani_data, clean_title):
         poster = f"https://img.anili.st/media/{ani_data.get('id')}" if ani_data.get('id') else random.choice(PICS)
 
         caption = (
-            f"<blockquote><b>{ani_title}</b></blockquote>\n\n"
-            f"✦ <b>Type:</b> {ani_format}   |   <b>Status:</b> {status}\n"
-            f"{eps_chaps}   |   <b>Year:</b> {year}\n"
-            f"✦ <b>Genres:</b> {genres}\n"
-            f"✦ <b>Synopsis:</b> {synopsis}\n\n"
+            f"〈 {ani_title} 〉\n\n"
+            f"🌟{rating}% ⌯ {ani_format} ⍀ {genres}\n"
+            f"⋟ Season: {season}\n"
+            f"⋟ Episodes: {episodes}\n"
+            f"⋟ Year: {year}\n"
+            f"⋟ Status: {status}\n"
+            f"⋟ Quality: 480p, 720p, 1080p\n"
+            f"⋟ Synopsis:\n\n"
+            f"{synopsis}"
         )
         return poster, caption
     else:
