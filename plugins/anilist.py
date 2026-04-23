@@ -6,19 +6,21 @@ from aiohttp import ClientSession
 # Updated Query to accept 'type' (ANIME or MANGA)
 ANIME_GRAPHQL_QUERY = """
 query ($search: String, $type: MediaType) {
-  Media (search: $search, type: $type) {
-    id
-    title { english romaji }
-    type
-    format
-    status
-    episodes
-    chapters
-    seasonYear
-    season
-    genres
-    averageScore
-    description(asHtml: false)
+  Page(page: 1, perPage: 1) {
+    media(search: $search, type: $type, sort: POPULARITY_DESC) {
+      id
+      title { english romaji }
+      type
+      format
+      status
+      episodes
+      chapters
+      seasonYear
+      season
+      genres
+      averageScore
+      description(asHtml: false)
+    }
   }
 }
 """
