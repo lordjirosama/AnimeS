@@ -257,7 +257,7 @@ async def dbch_details(client, query):
          await query.message.edit_media(
              media=InputMediaPhoto(
                  media=poster,
-                caption=caption
+              #  caption=caption
         ),
         reply_markup=InlineKeyboardMarkup(btn)
     )
