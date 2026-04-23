@@ -204,8 +204,8 @@ def build_details_caption(ani_data, clean_title):
         synopsis = str(ani_data.get('description', 'No synopsis available.')) \
             .replace("<br>", "").replace("<i>", "").replace("</i>", "")
 
-        if len(synopsis) > 500:
-            synopsis = synopsis[:500] + "..."
+        if len(synopsis) > 300:
+            synopsis = synopsis[:300] + "..."
         poster = f"https://img.anili.st/media/{ani_data.get('id')}" if ani_data.get('id') else random.choice(PICS)
 
         caption = (
@@ -216,8 +216,7 @@ def build_details_caption(ani_data, clean_title):
             f"⋟ Year: {year}\n"
             f"⋟ Status: {status}\n"
             f"⋟ Quality: 480p, 720p, 1080p\n"
-            f"⋟ Synopsis:\n\n"
-            f"{synopsis}"
+            f"⋟ Synopsis: {synopsis}"
         )
         return poster, caption
     else:
