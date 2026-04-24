@@ -91,13 +91,44 @@ async def fast_anilist_search(query, req_type="ALL"):
         except Exception: return []
 
 async def fast_anilist_fetch_by_id(ani_id):
-    graphql = """query ($id: Int) { Media (id: $id) { id title { english romaji } type format status episodes chapters seasonYear genres description(asHtml: false) } }"""
+    graphql = """
+    query ($id: Int) { 
+        Media (id: $id) { 
+            id
+            title { english romaji }
+            type
+            format
+            status
+            episodes
+            chapters
+            seasonYear
+            season
+            genres
+            averageScore
+            description(asHtml: false)
+        } 
+    }
+    """
+
     async with aiohttp.ClientSession() as sess:
         try:
-            async with sess.post("https://graphql.anilist.co", json={'query': graphql, 'variables': {'id': ani_id}}, timeout=3) as resp:
+            async with sess.post(
+                "https://graphql.anilist.co",
+                json={'query': graphql, 'variables': {'id': ani_id}},
+                timeout=5
+            ) as resp:
+
                 data = await resp.json()
+
+                # ✅ DEBUG (optional but useful)
+                print("\n===== ANILIST FETCH BY ID =====")
+                print(data)
+
                 return data.get('data', {}).get('Media') or {}
-        except Exception: return {}
+
+        except Exception as e:
+            print("❌ ERROR:", e)
+            return {}
 
 async def perform_search_list_group(client, message, query, req_type="ALL", is_callback=False, is_auto=False, cb_user_id=None):
     user_id = cb_user_id or (message.from_user.id if message.from_user else None)
@@ -193,23 +224,45 @@ def build_details_caption_group(ani_data, clean_title):
         ani_title = ani_data.get('title', {}).get('english') or ani_data.get('title', {}).get('romaji') or clean_title
         ani_format = ani_data.get('format', 'Unknown')
         status = ani_data.get('status', 'Unknown')
-        year = ani_data.get('seasonYear', 'N/A')
+
+        # ✅ rating fix
+        rating = ani_data.get("averageScore")
+        rating_text = f"{rating}%" if rating else "N/A"
+
+        # ✅ season fix
+        season = ani_data.get("season")
+        year = ani_data.get("seasonYear")
+        season_text = f"{season} {year}" if season and year else "N/A"
+
+        # ✅ episodes fix
+        eps = ani_data.get("episodes")
+        episodes = eps if eps else "Ongoing"
+
         genres = ", ".join(ani_data.get('genres', [])[:3]) if ani_data.get('genres') else "N/A"
-        eps_chaps = f"✦ **Chapters:** {ani_data.get('chapters', 'N/A')}" if ani_data.get('type') == "MANGA" else f"✦ **Episodes:** {ani_data.get('episodes', 'N/A')}"
-        synopsis = str(ani_data.get('description', 'No synopsis available.')).replace("<br>", "").replace("<i>", "").replace("</i>", "")
-        if len(synopsis) > 200: synopsis = synopsis[:200] + "..."
-        poster = f"https://img.anili.st/media/{ani_data.get('id')}" if ani_data.get('id') else random.choice(PICS)
+
+        synopsis = str(ani_data.get('description', 'No synopsis available.')) \
+            .replace("<br>", "").replace("<i>", "").replace("</i>", "")
+
+        if len(synopsis) > 300:
+            synopsis = synopsis[:300] + "..."
+
+        poster = f"https://img.anili.st/media/{ani_data.get('id')}"
 
         caption = (
-            f"<blockquote>**{ani_title}**</blockquote>\n\n"
-            f"✦ **Type:** {ani_format}   |   **Status:** {status}\n"
-            f"{eps_chaps}   |   **Year:** {year}\n"
-            f"✦ **Genres:** {genres}\n"
-            f"✦ **Synopsis:** {synopsis}\n\n"
+            f"〈 {ani_title} 〉\n\n"
+            f"🌟{rating_text} ⌯ {ani_format} ⍀ {genres}\n"
+            f"⋟ Season: {season_text}\n"
+            f"⋟ Episodes: {episodes}\n"
+            f"⋟ Status: {status}\n"
+            f"⋟ Quality: 480p, 720p, 1080p\n"
+            f"⋟ Synopsis: {synopsis}\n\n"
         )
-        return poster, caption
-    else: return random.choice(PICS), f"<blockquote>**{clean_title}**</blockquote>\n\n✦ **Status:** Found in Database ✅\n\n"
 
+        return poster, caption
+
+    else:
+        return None, f"<b>{clean_title}</b>\n\nStatus: Found in Database ✅"
+        
 @Bot.on_callback_query(filters.regex(r"^grp_dbch_(-?\d+)_(.*)_(.*)$"), group=-1)
 async def grp_dbch_details(client, query):
     ch_id, req_type, sq = int(query.matches[0].group(1)), query.matches[0].group(2), query.matches[0].group(3)
