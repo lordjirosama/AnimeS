@@ -6,16 +6,13 @@ files_cmd_pic = "https://envs.sh/7nm.jpg"
 autodel_cmd_pic = "https://envs.sh/7nm.jpg"
 
 #start message
-START_MSG = """<b>Hᴇʏ {mention}
-
+START_MSG = """<b>ʜᴇʏ {mention}
 ɪ ᴀᴍ ᴊᴜsᴛ ᴀɴɪᴍᴇ ᴄʜᴀɴɴᴇʟ sᴇᴀʀᴄʜ ʙᴏᴛ  
-Ex : one piece </b>"""
+Example : one piece </b>"""
 
 #Force sub message 
-FORCE_MSG = """<b><blockquote>⚠️ Hᴇʏ, {mention} ×</blockquote>
-Yᴏᴜ ʜᴀᴠᴇɴ'ᴛ ᴊᴏɪɴᴇᴅ {count}/{total} ᴄʜᴀɴɴᴇʟs ʏᴇᴛ. Pʟᴇᴀsᴇ ᴊᴏɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟs ᴘʀᴏᴠɪᴅᴇᴅ ʙᴇʟᴏᴡ, ᴛʜᴇɴ ᴛʀʏ ᴀɢᴀɪɴ.. !
-
-❗Fᴀᴄɪɴɢ ᴘʀᴏʙʟᴇᴍs, ᴜsᴇ: /help</b>"""
+FORCE_MSG = """<b><blockquote>›› ʜᴇʏ {mention} ×</blockquote>
+ ‼️ ʟᴏᴏᴋs ʟɪᴋᴇ ʏᴏᴜ ʜᴀᴠᴇɴ'ᴛ sᴜʙsᴄʀɪʙᴇᴅ ᴛᴏ ᴏᴜʀ ᴄʜᴀɴɴᴇʟs ʏᴇᴛ, sᴜʙsᴄʀɪʙᴇ ɴᴏᴡ.</b>"""
 
 CMD_TXT = """ <b>⚙️ Cᴏɴғɪɢᴜʀᴀᴛɪᴏɴs</b>
 <blockquote expandable>◈ ᴛᴏᴛᴀʟ ғᴏʀᴄᴇ sᴜʙ ᴄʜᴀɴɴᴇʟ:  <b>{total_fsub}</b>
