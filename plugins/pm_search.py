@@ -11,7 +11,7 @@ from config import OWNER_ID, PICS, LOG_CHANNEL
 from helper_func import is_userJoin
 from plugins.FORMATS import FORCE_MSG 
 
-AUTO_DELETE_DELAY = 10  # 5 minutes
+AUTO_DELETE_DELAY = 300  # 5 minutes
 
 # --- ✈️ AUTO DELETE HELPER ---
 async def auto_delete_messages(*msgs, delay=AUTO_DELETE_DELAY):
