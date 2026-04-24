@@ -288,7 +288,7 @@ async def grp_dbch_details(client, query):
     else: link = await client.create_chat_invite_link(ch_id, expire_date=expire_date)
 
     poster, caption = build_details_caption_group(ani_data, clean_title)
-    caption += "👇 **Please click the button below to access your files:**\n⏳ _This message will be deleted shortly._"
+    caption += "👇 **Please click the button below to access your channel."
     btn = [
         [InlineKeyboardButton(f"🎥🍿: {clean_title[:15]}", url=link.invite_link)],
         [InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"grp_bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="grp_close_panel")]
@@ -319,7 +319,7 @@ async def grp_aclk_details(client, query):
         caption += "👇 **Please click the button below to access your files:**\n⏳ _This message will be deleted shortly._"
         btn.append([InlineKeyboardButton(f"🎥🍿: {title[:15]}", url=link.invite_link)])
     else:
-        caption += "⚠️ Status: Not available in Database.\n👇 Click the button below to request an upload!\n⏳ _This message will be deleted shortly."
+        caption += "⚠️ Status: Channel not available.\n👇 Click the button below to request to upload!"
         btn.append([InlineKeyboardButton("ʀᴇǫᴜᴇꜱᴛ ᴛᴏ ᴜᴘʟᴏᴀᴅ", callback_data=f"grp_req_{ani_id}")])
 
     btn.append([InlineKeyboardButton("ʙᴀᴄᴋ", callback_data=f"grp_bck_{sq}"), InlineKeyboardButton("ᴄʟᴏꜱᴇ", callback_data="grp_close_panel")])
