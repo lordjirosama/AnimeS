@@ -7,11 +7,7 @@ from plugins.autoDelete import convert_time
 from database.database import kingdb
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto, ReplyKeyboardMarkup, ReplyKeyboardRemove    
 
-@Bot.on_message(filters.command('cmd') & filters.private & is_admin)
-async def bcmd(bot: Bot, message: Message):        
-    reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Cʟᴏsᴇ ✖️", callback_data = "close")]])
-    await message.reply(text=CMD_TXT, reply_markup = reply_markup, quote= True)
-    
+
 #File setting function for retriveing modes and state of file related setting
 async def fileSettings(getfunc, setfunc=None, delfunc=False) :
     btn_mode, txt_mode, pic_mode = '❌', off_txt, off_pic
