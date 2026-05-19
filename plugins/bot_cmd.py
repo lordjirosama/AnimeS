@@ -143,10 +143,7 @@ async def info(client: Bot, message: Message):
     await temp_msg.edit(f"🚻 : <b>{len(users)} USERS\n\n🤖 UPTIME » {bottime}\n\n📡 PING » {ping_time:.2f} ms</b>", reply_markup = reply_markup,)
 
 
-@Bot.on_message(filters.command('cmd') & filters.private & is_admin)
-async def bcmd(bot: Bot, message: Message):        
-    reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Cʟᴏsᴇ ✖️", callback_data = "close")]])
-    await message.reply(text=CMD_TXT, reply_markup = reply_markup, quote= True)
+
     
 #-----------------------------------------------------------------------------------------------------------------------------------------------------------------------#    
 
