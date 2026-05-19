@@ -1,5 +1,3 @@
-# +++ Made By King [telegram username: @Shidoteshika1] +++
-
 from aiohttp import web
 from plugins import web_server
 
@@ -7,6 +5,7 @@ import asyncio
 import pyromod.listen
 from pyrogram import Client
 from pyrogram.enums import ParseMode
+from pyrogram.types import BotCommand  # ✅ ADD THIS IMPORT
 import sys
 from datetime import datetime
 
@@ -28,6 +27,13 @@ class Bot(Client):
             bot_token=TG_BOT_TOKEN
         )
         self.LOGGER = LOGGER
+
+    async def set_bot_commands_list(self):  # ✅ NEW METHOD
+        commands = [
+            BotCommand("start", "⚡️ sᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ / ᴄʜᴇᴄᴋ ᴀʟɪᴠᴇ"),
+            BotCommand("cmd", "⚡️ ᴏᴡɴᴇʀ"),
+        ]
+        await self.set_bot_commands(commands)
 
     async def start(self):
         await super().start()
@@ -52,6 +58,8 @@ class Bot(Client):
             self.LOGGER(__name__).warning(f"Make Sure bot is Admin in DB Channel and have proper Permissions, So Double check the CHANNEL_ID Value, Current Value {CHANNEL_ID}")
             self.LOGGER(__name__).info('Bot Stopped..')
             sys.exit()
+
+        await self.set_bot_commands_list()  # ✅ CALL HERE
 
         self.set_parse_mode(ParseMode.HTML)
         self.LOGGER(__name__).info(f"Aᴅᴠᴀɴᴄᴇ Fɪʟᴇ-Sʜᴀʀɪɴɢ ʙᴏᴛV3 Mᴀᴅᴇ Bʏ ➪ @Shidoteshika1 [Tᴇʟᴇɢʀᴀᴍ Usᴇʀɴᴀᴍᴇ]")
