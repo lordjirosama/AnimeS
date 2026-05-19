@@ -1,5 +1,3 @@
-# +++ Made By King [telegram username: @Shidoteshika1] +++
-
 #from bot import Bot
 import asyncio
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton 
