@@ -1,11 +1,12 @@
 from aiohttp import web
 from plugins import web_server
 
+import os
 import asyncio
 import pyromod.listen
 from pyrogram import Client
 from pyrogram.enums import ParseMode
-from pyrogram.types import BotCommand  # ✅ ADD THIS IMPORT
+from pyrogram.types import BotCommand
 import sys
 from datetime import datetime
 import subprocess
@@ -33,7 +34,7 @@ class Bot(Client):
         )
         self.LOGGER = LOGGER
 
-    async def set_bot_commands_list(self):  # ✅ NEW METHOD
+    async def set_bot_commands_list(self):
         commands = [
             BotCommand("start", "⚡️ sᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ / ᴄʜᴇᴄᴋ ᴀʟɪᴠᴇ"),
             BotCommand("cmd", "⚡️ ᴏᴡɴᴇʀ"),
@@ -46,7 +47,7 @@ class Bot(Client):
         self.name = bot_info.first_name
         self.username = bot_info.username
         self.uptime = datetime.now()
-                
+
         try:
             db_channel = await self.get_chat(CHANNEL_ID)
 
@@ -54,36 +55,36 @@ class Bot(Client):
                 db_channel.invite_link = await self.export_chat_invite_link(CHANNEL_ID)
 
             self.db_channel = db_channel
-            
-            test = await self.send_message(chat_id = db_channel.id, text = "Testing")
+
+            test = await self.send_message(chat_id=db_channel.id, text="Testing")
             await test.delete()
-            
+
         except Exception as e:
             self.LOGGER(__name__).warning(e)
             self.LOGGER(__name__).warning(f"Make Sure bot is Admin in DB Channel and have proper Permissions, So Double check the CHANNEL_ID Value, Current Value {CHANNEL_ID}")
             self.LOGGER(__name__).info('Bot Stopped..')
             sys.exit()
 
-        await self.set_bot_commands_list()  # ✅ CALL HERE
+        await self.set_bot_commands_list()
 
         self.set_parse_mode(ParseMode.HTML)
         self.LOGGER(__name__).info(f"Aᴅᴠᴀɴᴄᴇ Fɪʟᴇ-Sʜᴀʀɪɴɢ ʙᴏᴛV3 Mᴀᴅᴇ Bʏ ➪ @Shidoteshika1 [Tᴇʟᴇɢʀᴀᴍ Usᴇʀɴᴀᴍᴇ]")
         self.LOGGER(__name__).info(f"{self.name} Bot Running..!")
         self.LOGGER(__name__).info(f"OPERATION SUCCESSFULL ✅")
-        #web-response
+
         app = web.AppRunner(await web_server())
         await app.setup()
         bind_address = "0.0.0.0"
         await web.TCPSite(app, bind_address, PORT).start()
 
-        try: await self.send_message(OWNER_ID, text = f"<b><blockquote>🤖 Bᴏᴛ Rᴇsᴛᴀʀᴛᴇᴅ ♻️</blockquote></b>")
-        except: pass
+        try:
+            await self.send_message(OWNER_ID, text=f"<b><blockquote>🤖 Bᴏᴛ Rᴇsᴛᴀʀᴛᴇᴅ ♻️</blockquote></b>")
+        except:
+            pass
 
     async def stop(self, *args):
         await super().stop()
         self.LOGGER(__name__).info(f"{self.name} Bot stopped.")
-
-
 
 
 @Client.on_message(filters.command("update") & filters.private)
@@ -108,6 +109,9 @@ async def update_bot(bot: Client, message: Message):
                 f"❌ ɢɪᴛ ᴘᴜʟʟ ғᴀɪʟᴇᴅ:\n\n<code>{git_pull.stderr}</code>",
                 parse_mode=enums.ParseMode.HTML
             )
+
+        if "Already up to date" in git_pull.stdout:
+            return await msg.edit_text("✅ ʙᴏᴛ ɪs ᴀʟʀᴇᴀᴅʏ ᴜᴘ ᴛᴏ ᴅᴀᴛᴇ. ɴᴏ ʀᴇsᴛᴀʀᴛ ɴᴇᴇᴅᴇᴅ.")
 
         await msg.edit_text(
             f"✅ ɢɪᴛ ᴜᴘᴅᴀᴛᴇᴅ:\n\n<code>{git_pull.stdout}</code>",
@@ -135,3 +139,4 @@ async def update_bot(bot: Client, message: Message):
         )
 
     os.execl(sys.executable, sys.executable, *sys.argv)
+            
