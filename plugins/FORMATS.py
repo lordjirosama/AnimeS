@@ -6,9 +6,18 @@ files_cmd_pic = "https://envs.sh/7nm.jpg"
 autodel_cmd_pic = "https://envs.sh/7nm.jpg"
 
 #start message
-START_MSG = """<b>ʜᴇʏ {mention}
-ɪ ᴀᴍ ᴊᴜsᴛ ᴀɴɪᴍᴇ ᴄʜᴀɴɴᴇʟ sᴇᴀʀᴄʜ ʙᴏᴛ  
-Example : one piece </b>"""
+START_MSG = """<b>✨ Welcome to the Anime Hub, {mention}! ✨
+
+I am your advanced Anime Channel Search Bot, engineered to find your favorite anime series, movies, and channels instantly. 
+
+🔍 How to Search:
+Just type the name of the anime you are looking for and hit send.
+
+📌 Example: One Piece
+📌 Example: Jujutsu Kaisen
+
+🚀 Start typing to explore the anime world!
+</b>"""
 
 #Force sub message 
 FORCE_MSG = """<b><blockquote>›› ʜᴇʏ {mention} ×</blockquote>
