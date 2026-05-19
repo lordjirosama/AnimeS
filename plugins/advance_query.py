@@ -93,6 +93,27 @@ async def cb_handler(client: Bot, query: CallbackQuery):
             ]),
         )
         
+    elif data == "CMD_TXT":
+    if await authoUser(query, query.from_user.id):
+        await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+        
+        try:
+            await query.edit_message_media(
+                InputMediaPhoto(
+                    random.choice(PICS),
+                    CMD_TXT  # FORMATS.py se aa raha hai
+                ),
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton('⬅️ Bᴀᴄᴋ', callback_data='start'),
+                        InlineKeyboardButton('Cʟᴏsᴇ ✖️', callback_data='close')
+                    ]
+                ])
+            )
+        except Exception as e:
+            print(f"! Error Occured on callback data = 'CMD_TXT' : {e}")
+            
+        
     elif data == "setting":
         await query.edit_message_media(InputMediaPhoto(random.choice(PICS), "<b>Pʟᴇᴀsᴇ wᴀɪᴛ !\n\n<i>🔄 Rᴇᴛʀɪᴇᴠɪɴɢ ᴀʟʟ Sᴇᴛᴛɪɴɢs...</i></b>"))
         try:
