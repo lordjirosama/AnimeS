@@ -41,7 +41,7 @@ DB_NAME = os.environ.get("DATABASE_NAME", "")
 TG_BOT_WORKERS = int(os.environ.get("TG_BOT_WORKERS", ""))
 
 #Collection of pics for Bot // #Optional but atleast one pic link should be replaced if you don't want predefined links
-PICS = (os.environ.get("PICS", "https://ibb.co/sdQKGJ0Y")).split() #Required
+PICS = (os.environ.get("PICS", "https://ibb.co/sJqz5KZW")).split() #Required
 VIDEOS = (os.environ.get("VIDEOS", "")).split()
 #set your Custom Caption here, Keep None for Disable Custom Caption
 CUSTOM_CAPTION = os.environ.get("CUSTOM_CAPTION", "<b><blockquote expandable>{filename}</blockquote></b>")
