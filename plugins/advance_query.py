@@ -118,7 +118,7 @@ async def cb_handler(client: Bot, query: CallbackQuery):
                                 )
                 ),
                 reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('⬅️ Bᴀᴄᴋ', callback_data='start'), InlineKeyboardButton('Cʟᴏsᴇ ✖️', callback_data='close')]
+                [InlineKeyboardButton('⬅️ Bᴀᴄᴋ', callback_data='CMD_TXT'), InlineKeyboardButton('Cʟᴏsᴇ ✖️', callback_data='close')]
                 ]),
             )
         except Exception as e:
