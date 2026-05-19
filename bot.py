@@ -8,7 +8,12 @@ from pyrogram.enums import ParseMode
 from pyrogram.types import BotCommand  # ✅ ADD THIS IMPORT
 import sys
 from datetime import datetime
+import subprocess
 
+from pyrogram import Client, filters, enums
+from pyrogram.types import Message
+
+from config import OWNER_ID
 from config import API_HASH, APP_ID, LOGGER, TG_BOT_TOKEN, TG_BOT_WORKERS, CHANNEL_ID, PORT, OWNER_ID
 import pyrogram.utils
 pyrogram.utils.MIN_CHANNEL_ID = -1009147483647
@@ -78,13 +83,13 @@ class Bot(Client):
         await super().stop()
         self.LOGGER(__name__).info(f"{self.name} Bot stopped.")
 
-import subprocess
 
-@BotInstance.on_message(filters.command("update") & filters.private)
+
+
+@Client.on_message(filters.command("update") & filters.private)
 async def update_bot(bot: Client, message: Message):
 
-    # 🔐 Only admins allowed
-    if message.from_user.id not in ADMINS:
+    if message.from_user.id not in OWNER_ID:
         return await message.reply_text(
             "❌ ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴀᴜᴛʜᴏʀɪᴢᴇᴅ ᴛᴏ ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ."
         )
@@ -92,7 +97,6 @@ async def update_bot(bot: Client, message: Message):
     msg = await message.reply_text("🔄 ᴜᴘᴅᴀᴛɪɴɢ ʙᴏᴛ... ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ")
 
     try:
-        # 📥 Git Pull
         git_pull = subprocess.run(
             ["git", "pull"],
             capture_output=True,
@@ -106,11 +110,10 @@ async def update_bot(bot: Client, message: Message):
             )
 
         await msg.edit_text(
-            f"✅ ɢɪᴛ ᴜᴘᴅᴀᴛᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ:\n\n<code>{git_pull.stdout}</code>",
+            f"✅ ɢɪᴛ ᴜᴘᴅᴀᴛᴇᴅ:\n\n<code>{git_pull.stdout}</code>",
             parse_mode=enums.ParseMode.HTML
         )
 
-        # 📦 Install requirements (silent)
         await asyncio.sleep(2)
         await msg.edit_text("📦 ɪɴsᴛᴀʟʟɪɴɢ ʀᴇǫᴜɪʀᴇᴍᴇɴᴛs...")
 
@@ -120,10 +123,8 @@ async def update_bot(bot: Client, message: Message):
             stderr=subprocess.DEVNULL
         )
 
-        # 🔁 Restart
         await asyncio.sleep(2)
         await msg.edit_text("♻️ ʀᴇsᴛᴀʀᴛɪɴɢ ʙᴏᴛ...")
-        await msg.edit_text("♻️ ʀᴇsᴛᴀʀᴛɪɴɢ...")
         await asyncio.sleep(2)
         await msg.delete()
 
@@ -133,5 +134,4 @@ async def update_bot(bot: Client, message: Message):
             parse_mode=enums.ParseMode.HTML
         )
 
-    # 🚀 Restart bot
     os.execl(sys.executable, sys.executable, *sys.argv)
