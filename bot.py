@@ -77,3 +77,61 @@ class Bot(Client):
     async def stop(self, *args):
         await super().stop()
         self.LOGGER(__name__).info(f"{self.name} Bot stopped.")
+
+import subprocess
+
+@BotInstance.on_message(filters.command("update") & filters.private)
+async def update_bot(bot: Client, message: Message):
+
+    # 🔐 Only admins allowed
+    if message.from_user.id not in ADMINS:
+        return await message.reply_text(
+            "❌ ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴀᴜᴛʜᴏʀɪᴢᴇᴅ ᴛᴏ ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ."
+        )
+
+    msg = await message.reply_text("🔄 ᴜᴘᴅᴀᴛɪɴɢ ʙᴏᴛ... ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ")
+
+    try:
+        # 📥 Git Pull
+        git_pull = subprocess.run(
+            ["git", "pull"],
+            capture_output=True,
+            text=True
+        )
+
+        if git_pull.returncode != 0:
+            return await msg.edit_text(
+                f"❌ ɢɪᴛ ᴘᴜʟʟ ғᴀɪʟᴇᴅ:\n\n<code>{git_pull.stderr}</code>",
+                parse_mode=enums.ParseMode.HTML
+            )
+
+        await msg.edit_text(
+            f"✅ ɢɪᴛ ᴜᴘᴅᴀᴛᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ:\n\n<code>{git_pull.stdout}</code>",
+            parse_mode=enums.ParseMode.HTML
+        )
+
+        # 📦 Install requirements (silent)
+        await asyncio.sleep(2)
+        await msg.edit_text("📦 ɪɴsᴛᴀʟʟɪɴɢ ʀᴇǫᴜɪʀᴇᴍᴇɴᴛs...")
+
+        subprocess.run(
+            ["pip3", "install", "-r", "requirements.txt"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+        # 🔁 Restart
+        await asyncio.sleep(2)
+        await msg.edit_text("♻️ ʀᴇsᴛᴀʀᴛɪɴɢ ʙᴏᴛ...")
+        await msg.edit_text("♻️ ʀᴇsᴛᴀʀᴛɪɴɢ...")
+        await asyncio.sleep(2)
+        await msg.delete()
+
+    except Exception as e:
+        return await msg.edit_text(
+            f"❌ ᴇʀʀᴏʀ:\n<code>{e}</code>",
+            parse_mode=enums.ParseMode.HTML
+        )
+
+    # 🚀 Restart bot
+    os.execl(sys.executable, sys.executable, *sys.argv)
