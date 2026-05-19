@@ -3,7 +3,7 @@ from bot import Bot
 from plugins.FORMATS import *
 from config import OWNER_ID, PICS
 from pyrogram.enums import ChatAction
-from plugins.autoDelete import convert_time
+from plugins.autoDelete import convert_time, CMD_TXT
 from database.database import kingdb
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto, ReplyKeyboardMarkup, ReplyKeyboardRemove    
 
