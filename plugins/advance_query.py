@@ -104,7 +104,7 @@ async def cb_handler(client: Bot, query: CallbackQuery):
                 ),
                 reply_markup=InlineKeyboardMarkup([
                     [
-                        InlineKeyboardButton('⬅️ Bᴀᴄᴋ', callback_data='start'),
+                        InlineKeyboardButton('Stutes', callback_data='setting'),
                         InlineKeyboardButton('Cʟᴏsᴇ ✖️', callback_data='close')
                     ]
                 ])
