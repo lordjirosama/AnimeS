@@ -1,5 +1,3 @@
-# +++ Made By King [telegram username: @Shidoteshika1] +++
-
 import random
 from bot import Bot
 from plugins.FORMATS import *
