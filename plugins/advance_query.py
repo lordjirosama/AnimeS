@@ -94,8 +94,8 @@ async def cb_handler(client: Bot, query: CallbackQuery):
         )
         
     elif data == "CMD_TXT":
-    if await authoUser(query, query.from_user.id):
-        await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+        if await authoUser(query, query.from_user.id):
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
         
         try:
             await query.edit_message_media(
