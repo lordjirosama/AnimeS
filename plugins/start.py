@@ -14,7 +14,12 @@ from config import CUSTOM_CAPTION, OWNER_ID, PICS
 from plugins.autoDelete import auto_del_notification, delete_message
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from helper_func import banUser, is_userJoin, is_admin, subscribed, encode, decode, get_messages
+from pyrogram.types import CallbackQuery
 
+@Client.on_callback_query()
+async def cb_handler(client, query: CallbackQuery):
+    pass
+    
 SHOW_BUTTONS = False  # False = hide buttons
 
 @Bot.on_message(filters.command('start') & filters.private & ~banUser & subscribed)
