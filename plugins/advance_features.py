@@ -3,6 +3,7 @@ import asyncio
 from pyrogram.enums import ParseMode, ChatAction
 from helper_func import is_admin, banUser
 from plugins.FORMATS import *
+from plugins import start
 from plugins.autoDelete import convert_time
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from config import OWNER_ID
