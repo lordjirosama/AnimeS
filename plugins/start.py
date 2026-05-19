@@ -8,7 +8,7 @@ from database.database import kingdb
 from pyrogram import Client, filters
 from pyrogram.errors import FloodWait
 from plugins.FORMATS import START_MSG, FORCE_MSG
-from plugins import advance_query
+from plugins.advance_query import cb_handler
 from pyrogram.enums import ParseMode, ChatAction
 from config import CUSTOM_CAPTION, OWNER_ID, PICS
 from plugins.autoDelete import auto_del_notification, delete_message
