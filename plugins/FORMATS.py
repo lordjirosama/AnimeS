@@ -23,7 +23,16 @@ Just type the name of the anime you are looking for and hit send.
 FORCE_MSG = """<b><blockquote>›› ʜᴇʏ {mention} ×</blockquote>
  ‼️ ʟᴏᴏᴋs ʟɪᴋᴇ ʏᴏᴜ ʜᴀᴠᴇɴ'ᴛ sᴜʙsᴄʀɪʙᴇᴅ ᴛᴏ ᴏᴜʀ ᴄʜᴀɴɴᴇʟs ʏᴇᴛ, sᴜʙsᴄʀɪʙᴇ ɴᴏᴡ.</b>"""
 
-CMD_TXT = """
+CMD_TXT = """ <b>⚙️ Cᴏɴғɪɢᴜʀᴀᴛɪᴏɴs</b>
+<blockquote>◈ ᴛᴏᴛᴀʟ ғᴏʀᴄᴇ sᴜʙ ᴄʜᴀɴɴᴇʟ:  <b>{total_fsub}</b>
+◈ ᴛᴏᴛᴀʟ ᴀᴅᴍɪɴs:  <b>{total_admin}</b>
+◈ ᴛᴏᴛᴀʟ ʙᴀɴɴᴇᴅ ᴜsᴇʀs:  <b>{total_ban}</b>
+◈ ᴀᴜᴛᴏ ᴅᴇʟᴇᴛᴇ ᴍᴏᴅᴇ:  <b>{autodel_mode}</b>
+◈ ᴘʀᴏᴛᴇᴄᴛ ᴄᴏɴᴛᴇɴᴛ:  <b>{protect_content}</b>
+◈ ʜɪᴅᴇ ᴄᴀᴘᴛɪᴏɴ:  <b>{hide_caption}</b>
+◈ ᴄʜᴀɴɴᴇʟ ʙᴜᴛᴛᴏɴ:  <b>{chnl_butn}</b>
+◈ ʀᴇǫᴜᴇsᴛ ғsᴜʙ ᴍᴏᴅᴇ: <b>{reqfsub}</b></blockquote> 
+
 <b>/batch :</b> ᴄʀᴇᴀᴛᴇ ɢʀᴏᴜᴘ ᴍᴇssᴀɢᴇs
 
 <b>/genlink :</b> ᴄʀᴇᴀᴛᴇ ʟɪɴᴋ ғᴏʀ ᴏɴᴇ ᴘᴏsᴛ
