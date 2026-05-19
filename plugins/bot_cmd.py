@@ -146,7 +146,22 @@ async def info(client: Bot, message: Message):
 
     
 #-----------------------------------------------------------------------------------------------------------------------------------------------------------------------#    
+@Bot.on_message(filters.command('cmd') & filters.private & is_admin)
+async def bcmd(bot: Bot, message: Message):
 
+    reply_markup = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("Stutes", callback_data="setting"),
+            InlineKeyboardButton("Close ✖️", callback_data="close")
+        ]
+    ])
+
+    await message.reply(
+        text=CMD_TXT,
+        reply_markup=reply_markup,
+        quote=True
+    )
+    
 #--------------------------------------------------------------[[NORMAL USER ACCESSIBLE COMMANDS]]----------------------------------------------------------------------#
 
 @Bot.on_message(filters.command('forcesub') & filters.private & is_admin)
