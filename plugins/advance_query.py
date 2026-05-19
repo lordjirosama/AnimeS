@@ -1,6 +1,7 @@
 import random
 from bot import Bot
 from plugins.FORMATS import *
+from plugins import start
 from config import OWNER_ID, PICS
 from pyrogram.enums import ChatAction
 from plugins.autoDelete import convert_time
