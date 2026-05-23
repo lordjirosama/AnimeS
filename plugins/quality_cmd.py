@@ -1,17 +1,31 @@
 """
-quality_cmd.py — /quality command for FSB Bot
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Fixes vs v1:
-  • Per-session asyncio.Lock  →  safe when all 4 files sent at once
-  • finished flag             →  _finish never called twice
-  • 6-source filename probe   →  works for all forward types
-  • Regex WEB boundary check  →  no false positives
-  • Snapshot collected before clear  →  links always generated
+quality_cmd.py — /quality command  (v3 — ROOT BUG FIX)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ROOT BUG (v1 & v2):
+    message.stop_propagation() raises StopPropagation IMMEDIATELY.
+    Calling it BEFORE the processing code meant the handler
+    intercepted every file (blocking channel_post) but NEVER
+    ran any detection/collection logic.
+
+FIX:
+    stop_propagation() is now called at the VERY END of
+    quality_file_handler, after _process() has fully completed.
+    The exception then prevents channel_post.py from also running.
+
+Other improvements:
+    • print() at every step (visible in all log levels)
+    • extract ALL text: file_name + caption + message.text
+    • handles all media types (document/video/audio/animation/…)
+    • FloodWait compat:  e.value (new Pyrogram) / e.x (old Pyrogram)
+    • unknown quality reply now shows WHAT was checked → easy debug
 """
 
 import re
 import asyncio
+import traceback
 from dataclasses import dataclass, field
+
 from pyrogram import filters
 from pyrogram.types import Message
 from pyrogram.errors import FloodWait
@@ -22,226 +36,202 @@ from config import LOGGER
 
 logger = LOGGER(__name__)
 
-# ═══════════════════════════════════════════════════
-#  SESSION MODEL
-# ═══════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────
+#  command list  (same as channel_post.py — keep in sync)
+# ─────────────────────────────────────────────────────────
+try:
+    from plugins.channel_post import command_list as _CMD_LIST
+    print("[Quality] imported command_list from channel_post.py")
+except Exception as _e:
+    print(f"[Quality] could not import command_list ({_e}), using fallback")
+    _CMD_LIST = [
+        'start','users','broadcast','batch','genlink','help','cmd','info',
+        'add_fsub','fsub_chnl','restart','del_fsub','add_admins','del_admins',
+        'admin_list','cancel','auto_del','forcesub','files','add_banuser',
+        'del_banuser','banuser_list','status','search','req_fsub','setexpire',
+        'setjoinmode','approvegroup','disapprovegroup','index','setsearchmode',
+        'flink','quality',
+    ]
+
+
+# ─────────────────────────────────────────────────────────
+#  Session model
+# ─────────────────────────────────────────────────────────
 @dataclass
 class QualitySession:
-    collected: dict = field(default_factory=dict)   # {"480p": Message, ...}
-    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    finished: bool = False   # guard: _finish called only once
+    collected: dict = field(default_factory=dict)   # {key: Message}
+    lock:      asyncio.Lock = field(default_factory=asyncio.Lock)
+    finished:  bool = False
 
-
-# Global registry:  admin_user_id  →  QualitySession
 quality_sessions: dict[int, QualitySession] = {}
 
 QUALITY_ORDER   = ["480p", "720p", "1080p", "webrip"]
-QUALITY_DISPLAY = {"480p": "480p", "720p": "720p", "1080p": "1080p", "webrip": "WEB-Rip"}
+QUALITY_DISPLAY = {
+    "480p":   "480p",
+    "720p":   "720p",
+    "1080p":  "1080p",
+    "webrip": "WEB-Rip",
+}
 
-# ─── Regex for WEB variants — requires word boundary so "website" won't match ───
-_WEB_RE = re.compile(
-    r'\b(webrip|web[\s\-]rip|web)\b',
-    re.IGNORECASE,
-)
+_WEB_RE = re.compile(r'\b(webrip|web[\s\-]rip|web)\b', re.IGNORECASE)
 
 
-# ═══════════════════════════════════════════════════
-#  HELPERS
-# ═══════════════════════════════════════════════════
-
+# ─────────────────────────────────────────────────────────
+#  Helpers
+# ─────────────────────────────────────────────────────────
 def detect_quality(text: str) -> str | None:
-    """
-    Detect quality key from any string.
-    Order: 1080p → 720p → 480p → WEB  (avoids prefix mis-matches).
-    """
+    """Return canonical quality key or None."""
     if not text:
         return None
     t = text.lower()
-    if "1080p" in t:
-        return "1080p"
-    if "720p" in t:
-        return "720p"
-    if "480p" in t:
-        return "480p"
-    if _WEB_RE.search(t):
-        return "webrip"
+    if "1080p" in t: return "1080p"
+    if "720p"  in t: return "720p"
+    if "480p"  in t: return "480p"
+    if _WEB_RE.search(t): return "webrip"
     return None
 
 
-def extract_name(message: Message) -> str:
+def extract_all_text(message: Message) -> list[str]:
     """
-    Probe every location Pyrogram stores the original filename
-    for both direct uploads AND forwarded files.
+    Collect every piece of text that might contain a quality tag,
+    in priority order: media file_name → caption → message text.
+    """
+    sources: list[str] = []
 
-    Priority order (most reliable → least reliable):
-      1. document.file_name
-      2. video.file_name
-      3. audio.file_name
-      4. message.caption  (forwarded channel posts often carry filename as caption)
-      5. forward origin caption  (Pyrogram copies caption to message.caption already,
-         but kept as explicit fallback for clarity)
-      6. document/video mime hints  (last resort: never contains quality but logged)
-    """
-    # 1-3: direct media metadata
-    for attr in ("document", "video", "audio"):
+    for attr in ("document", "video", "audio", "animation", "voice", "video_note"):
         media = getattr(message, attr, None)
-        if media and getattr(media, "file_name", None):
-            return media.file_name
+        if media:
+            fn = getattr(media, "file_name", None)
+            if fn:
+                sources.append(fn)
 
-    # 4-5: caption (same field for both direct and forwarded in Pyrogram)
     if message.caption:
-        return message.caption
+        sources.append(message.caption)
+    if message.text:
+        sources.append(message.text)
 
-    # 6: nothing useful found
-    return ""
+    return sources
+
+
+def has_media(message: Message) -> bool:
+    return bool(
+        message.document or message.video or message.audio or
+        message.animation or message.voice or message.video_note or
+        message.photo or message.sticker
+    )
 
 
 def build_progress(collected: dict) -> str:
     lines = ["<b>Rᴇᴄᴇɪᴠᴇᴅ:</b>"]
     for key in QUALITY_ORDER:
-        icon  = "✅" if key in collected else "❌"
+        icon = "✅" if key in collected else "❌"
         lines.append(f"{icon} {QUALITY_DISPLAY[key]}")
     return "\n".join(lines)
 
 
-async def _generate_link(client: Bot, message: Message) -> str:
-    """Copy to DB channel and return start-link (same as channel_post.py)."""
+async def _gen_link(client: Bot, message: Message) -> str:
+    """Copy to DB channel → return bot start-link (same as channel_post.py)."""
     try:
         post = await message.copy(chat_id=client.db_channel.id, disable_notification=True)
     except FloodWait as e:
-        logger.warning(f"[Quality] FloodWait {e.value}s — sleeping")
-        await asyncio.sleep(e.value)
+        wait = getattr(e, "value", getattr(e, "x", 5))
+        print(f"[Quality] FloodWait {wait}s")
+        await asyncio.sleep(wait)
         post = await message.copy(chat_id=client.db_channel.id, disable_notification=True)
 
-    converted_id  = post.id * abs(client.db_channel.id)
-    base64_string = await encode(f"get-{converted_id}")
-    return f"https://t.me/{client.username}?start={base64_string}"
+    cid  = post.id * abs(client.db_channel.id)
+    b64  = await encode(f"get-{cid}")
+    return f"https://t.me/{client.username}?start={b64}"
 
 
 def _clear(user_id: int) -> None:
     quality_sessions.pop(user_id, None)
-    logger.info(f"[Quality] Session cleared  user={user_id}")
+    msg = f"[Quality] Session cleared  user={user_id}"
+    logger.info(msg); print(msg)
 
 
-# ═══════════════════════════════════════════════════
-#  FINISH — generate links & output (called exactly once per session)
-# ═══════════════════════════════════════════════════
 async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: Message) -> None:
-    """
-    Snapshot collected dict BEFORE clearing session so that even if
-    the session is evicted during link generation, we still have the data.
-    """
-    # Snapshot — we own this reference regardless of what happens to quality_sessions
-    snapshot = dict(session.collected)
-
-    status = await trigger.reply(
-        "<b><i>⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ ʟɪɴᴋs, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ...</i></b>",
-        disable_web_page_preview=True,
-    )
-    # Clear session immediately so the admin can start a new one
+    """Generate links for all 4 qualities, send result, clear session."""
+    snapshot = dict(session.collected)   # snapshot before clear
     _clear(user_id)
 
+    status = await trigger.reply(
+        "<b><i>⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ ʟɪɴᴋs...</i></b>",
+        disable_web_page_preview=True,
+    )
     try:
         links: dict[str, str] = {}
         for key in QUALITY_ORDER:
-            links[key] = await _generate_link(client, snapshot[key])
-            logger.info(f"[Quality] user={user_id}  {key} → {links[key]}")
+            links[key] = await _gen_link(client, snapshot[key])
+            msg = f"[Quality] link  user={user_id}  {key} → {links[key]}"
+            logger.info(msg); print(msg)
 
         final = (
             f"𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
             f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗪𝗘𝗕-𝗥𝗶𝗽 - {links['webrip']}"
         )
         await status.edit(final, disable_web_page_preview=True)
-        logger.info(f"[Quality] Task done  user={user_id}")
+        msg = f"[Quality] Task done  user={user_id}"
+        logger.info(msg); print(msg)
 
     except Exception as exc:
-        logger.error(f"[Quality] Link gen failed  user={user_id}: {exc}", exc_info=True)
+        tb = traceback.format_exc()
+        logger.error(f"[Quality] _finish error  user={user_id}: {exc}")
+        print(f"[Quality] _finish error  user={user_id}: {exc}\n{tb}")
         await status.edit(
-            f"<b>❌ Eʀʀᴏʀ ɢᴇɴᴇʀᴀᴛɪɴɢ ʟɪɴᴋs:</b>\n"
-            f"<blockquote><code>{exc}</code></blockquote>"
+            f"<b>❌ Eʀʀᴏʀ:</b>\n<blockquote><code>{exc}</code></blockquote>"
         )
 
 
-# ═══════════════════════════════════════════════════
-#  /quality — start session
-# ═══════════════════════════════════════════════════
-@Bot.on_message(filters.command("quality") & filters.private & is_admin, group=-1)
-async def quality_cmd(client: Bot, message: Message):
-    user_id = message.from_user.id
+# ─────────────────────────────────────────────────────────
+#  Inner processing — separated so stop_propagation()
+#  can be called AFTER this returns in the outer handler.
+# ─────────────────────────────────────────────────────────
+async def _process(client: Bot, message: Message, user_id: int, session: QualitySession) -> None:
+    """Detect quality, store file, send progress. Called inside quality_file_handler."""
 
-    _clear(user_id)
-    quality_sessions[user_id] = QualitySession()
-    logger.info(f"[Quality] Session started  user={user_id}")
+    print(f"[Quality] _process called  user={user_id}  has_media={has_media(message)}")
 
-    await message.reply(
-        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• WEB-Rip",
-        quote=True,
-    )
-    message.stop_propagation()
-
-
-# ═══════════════════════════════════════════════════
-#  /cancel — quality-aware (group -1 → runs before broadcast cancel)
-# ═══════════════════════════════════════════════════
-@Bot.on_message(filters.command("cancel") & filters.private & is_admin, group=-1)
-async def quality_cancel(client: Bot, message: Message):
-    user_id = message.from_user.id
-    if user_id in quality_sessions:
-        _clear(user_id)
-        logger.info(f"[Quality] Cancelled by admin  user={user_id}")
-        await message.reply("<b>✅ Qᴜᴀʟɪᴛʏ ᴛᴀsᴋ ᴄᴀɴᴄᴇʟʟᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ.</b>", quote=True)
-        message.stop_propagation()   # don't trigger broadcast cancel
-    # else: fall through → broadcast cancel in bot_cmd.py
-
-
-# ═══════════════════════════════════════════════════
-#  File handler — document / video / audio (group -1)
-#
-#  • Runs BEFORE channel_post.py (group 0)
-#  • stop_propagation() only when session is active
-#    → files sent outside quality mode still get normal auto-link
-#  • Entire body wrapped in per-session Lock
-#    → safe when all 4 files arrive simultaneously (media group)
-# ═══════════════════════════════════════════════════
-@Bot.on_message(
-    filters.private & is_admin & (filters.document | filters.video | filters.audio),
-    group=-1,
-)
-async def quality_file_handler(client: Bot, message: Message):
-    user_id = message.from_user.id
-
-    # ── No active session → normal auto-link flow ────────────────
-    if user_id not in quality_sessions:
-        return
-
-    session = quality_sessions[user_id]
-
-    # ── Active session → we own this message ─────────────────────
-    message.stop_propagation()   # block channel_post.py
-
-    # ── Lock: safe for media-group (all 4 files at once) ─────────
     async with session.lock:
 
-        # Session may have been cancelled while we waited for the lock
-        if user_id not in quality_sessions or quality_sessions[user_id] is not session:
+        # Session might have been cancelled while waiting for lock
+        if quality_sessions.get(user_id) is not session:
+            print(f"[Quality] session changed/gone during lock wait  user={user_id}")
             return
 
-        # Session already completed (another coroutine just finished it)
         if session.finished:
+            print(f"[Quality] already finished  user={user_id}")
             return
 
-        # ── Probe filename from all possible sources ──────────────
-        name    = extract_name(message)
-        quality = detect_quality(name)
+        # ── Require actual media ───────────────────────────────────
+        if not has_media(message):
+            print(f"[Quality] no media  user={user_id}")
+            await message.reply(
+                "⚠️ <b>Pʟᴇᴀsᴇ sᴇɴᴅ ᴀ ғɪʟᴇ</b> (document, video, etc.)",
+                quote=True,
+            )
+            return
 
-        logger.debug(
-            f"[Quality] user={user_id}  name='{name}'  quality={quality}"
-        )
+        # ── Probe every available text source ─────────────────────
+        sources = extract_all_text(message)
+        quality = None
+        matched = None
+        for src in sources:
+            q = detect_quality(src)
+            if q:
+                quality = q
+                matched = src
+                break
+
+        print(f"[Quality] detection  user={user_id}  sources={sources}  result={quality}")
+        logger.info(f"[Quality] detection  user={user_id}  sources={sources}  result={quality}")
 
         if quality is None:
+            preview = ", ".join(repr(s[:50]) for s in sources) if sources else "NONE FOUND"
             await message.reply(
-                "⚠️ <b>Uɴᴋɴᴏᴡɴ ǫᴜᴀʟɪᴛʏ ᴅᴇᴛᴇᴄᴛᴇᴅ.</b>\n"
-                "<i>Filename or caption must contain: 480p / 720p / 1080p / WEBRip / WEB-Rip</i>",
+                f"⚠️ <b>Uɴᴋɴᴏᴡɴ ǫᴜᴀʟɪᴛʏ.</b>\n"
+                f"<b>Checked:</b> <code>{preview}</code>\n"
+                f"<i>Need 480p / 720p / 1080p / WEBRip / WEB-Rip in filename or caption.</i>",
                 quote=True,
             )
             return
@@ -253,20 +243,95 @@ async def quality_file_handler(client: Bot, message: Message):
             )
             return
 
-        # Accept
+        # ── Accept ────────────────────────────────────────────────
         session.collected[quality] = message
         count = len(session.collected)
-        logger.info(f"[Quality] user={user_id}  accepted {quality}  ({count}/4)")
+        msg = f"[Quality] accepted  user={user_id}  quality={quality}  {count}/4  from='{matched}'"
+        logger.info(msg); print(msg)
 
-        # Progress reply (inside lock so order is correct even for media group)
         await message.reply(build_progress(session.collected), quote=True)
 
-        # All 4 collected
         if count == 4:
-            session.finished = True   # guard against double-finish
-            # Release lock before the long async link-generation work
-            # so /cancel can still run if needed
-    
-    # ── Outside lock: finish task (no lock needed, snapshot is taken inside _finish) ──
-    if session.finished and session is quality_sessions.get(user_id):
+            session.finished = True
+
+    # ── Outside lock: finish if all 4 collected ────────────────────
+    if session.finished and quality_sessions.get(user_id) is session:
         await _finish(client, session, user_id, message)
+
+
+# ═══════════════════════════════════════════════════════════
+#  /quality  — start session
+# ═══════════════════════════════════════════════════════════
+@Bot.on_message(filters.command("quality") & filters.private & is_admin, group=-1)
+async def quality_cmd(client: Bot, message: Message):
+    user_id = message.from_user.id
+    _clear(user_id)
+    quality_sessions[user_id] = QualitySession()
+    msg = f"[Quality] Session started  user={user_id}"
+    logger.info(msg); print(msg)
+
+    await message.reply(
+        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• WEB-Rip",
+        quote=True,
+    )
+    message.stop_propagation()
+
+
+# ═══════════════════════════════════════════════════════════
+#  /cancel  — quality-aware (group -1 → before broadcast cancel)
+# ═══════════════════════════════════════════════════════════
+@Bot.on_message(filters.command("cancel") & filters.private & is_admin, group=-1)
+async def quality_cancel(client: Bot, message: Message):
+    user_id = message.from_user.id
+    if user_id in quality_sessions:
+        _clear(user_id)
+        print(f"[Quality] Cancelled  user={user_id}")
+        await message.reply("<b>✅ Qᴜᴀʟɪᴛʏ ᴛᴀsᴋ ᴄᴀɴᴄᴇʟʟᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ.</b>", quote=True)
+        message.stop_propagation()   # block broadcast cancel
+    # else: fall through to broadcast cancel in bot_cmd.py
+
+
+# ═══════════════════════════════════════════════════════════
+#  File/message handler  (group -1 → runs before channel_post)
+#
+#  ┌─ CRITICAL DESIGN NOTE ──────────────────────────────────┐
+#  │  stop_propagation() is called at the VERY END,          │
+#  │  AFTER _process() has fully finished.                   │
+#  │                                                         │
+#  │  Calling it at the TOP (as in v1/v2) raises             │
+#  │  StopPropagation immediately — skipping ALL code        │
+#  │  below it, so files were intercepted but never          │
+#  │  processed. That was the root bug.                      │
+#  └─────────────────────────────────────────────────────────┘
+# ═══════════════════════════════════════════════════════════
+@Bot.on_message(
+    ~filters.command(_CMD_LIST) & filters.private & is_admin,
+    group=-1,
+)
+async def quality_file_handler(client: Bot, message: Message):
+    user_id = message.from_user.id
+
+    print(f"[Quality] HANDLER ENTRY  user={user_id}  session_active={user_id in quality_sessions}")
+
+    # No active session → let channel_post.py handle normally
+    if user_id not in quality_sessions:
+        return
+
+    session = quality_sessions[user_id]
+
+    # ── Run all processing FIRST ──────────────────────────────────
+    try:
+        await _process(client, message, user_id, session)
+    except Exception as exc:
+        tb = traceback.format_exc()
+        logger.error(f"[Quality] handler error  user={user_id}: {exc}")
+        print(f"[Quality] handler error  user={user_id}: {exc}\n{tb}")
+        try:
+            await message.reply(f"<b>❌ Eʀʀᴏʀ:</b>\n<code>{exc}</code>", quote=True)
+        except Exception:
+            pass
+
+    # ── THEN raise StopPropagation to block channel_post.py ───────
+    # (This is safe here because all awaits are done above.)
+    print(f"[Quality] stopping propagation  user={user_id}")
+    message.stop_propagation()
