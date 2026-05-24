@@ -356,7 +356,6 @@ async def quality_file_handler(client: Bot, message: Message):
     print(f"[Quality] stopping propagation  user={user_id}")
     message.stop_propagation()
 
-
 # ═══════════════════════════════════════════════════════════
 #  ░░░  /squality  ░░░
 # ═══════════════════════════════════════════════════════════
@@ -416,13 +415,14 @@ async def _sq_finish(
 
         await _delete_progress(saved_msgs)
 
-        parts     = [f"{QUALITY_DISPLAY[k]} - {links[k]}" for k in required]
-        link_line = " && ".join(parts)
-
+        link_lines = "".join(
+            f"<b>{QUALITY_DISPLAY[k]}</b>\n<code>{links[k]}</code>\n\n"
+            for k in required
+        )
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            f"<code>{link_line}</code>\n\n"
-            "<i>💡 Tap to copy</i>"
+            f"{link_lines}"
+            "<i>💡 Tap any link to copy</i>"
         )
         await status.edit(final, disable_web_page_preview=True)
         msg = f"[SQuality] Task done  user={user_id}"
