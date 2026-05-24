@@ -348,4 +348,3 @@ async def quality_file_handler(client: Bot, message: Message):
     # (This is safe here because all awaits are done above.)
     print(f"[Quality] stopping propagation  user={user_id}")
     message.stop_propagation()
-        
