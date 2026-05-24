@@ -167,8 +167,8 @@ async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: M
             logger.info(msg); print(msg)
 
         final = (
-            f"`𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
-            f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗪𝗘𝗕-𝗥𝗶𝗽 - {links['webrip']}`"
+            f"` 𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
+            f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗪𝗘𝗕-𝗥𝗶𝗽 - {links['webrip']} `"
         )
         await status.edit(final, disable_web_page_preview=True)
         msg = f"[Quality] Task done  user={user_id}"
