@@ -1,24 +1,22 @@
 """
-quality_cmd.py — /quality command  (v4 — PROGRESS MSG CLEANUP)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+quality_cmd.py — /quality command  (v5 — SKIP BUTTON)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Changes in v5:
+    • Per-quality Skip buttons shown on every progress message
+    • Skipped qualities show ⏭ in progress and are excluded from final links
+    • Finish triggers when collected + skipped == 4
+    • Final message only shows available quality links
+    • Callback handler added for skip buttons
 
 Changes in v4:
-    • All 4 progress "Received:" messages are deleted after task finishes
-    • Only the final click-to-copy links message remains
-    • progress_msgs list added to QualitySession to track replies
-    • Unicode bold text replaced with clean HTML bold (nano fix)
-    • Each link wrapped in <code> block for tap-to-copy in Telegram
+    • All progress "Received:" messages deleted after task finishes
+    • Unicode bold text replaced with clean HTML bold
+    • Each link wrapped in <code> for tap-to-copy in Telegram
 
-ROOT BUG (v1 & v2):
-    message.stop_propagation() raises StopPropagation IMMEDIATELY.
-    Calling it BEFORE the processing code meant the handler
-    intercepted every file (blocking channel_post) but NEVER
-    ran any detection/collection logic.
-
-FIX (v3+):
-    stop_propagation() is now called at the VERY END of
-    quality_file_handler, after _process() has fully completed.
-    The exception then prevents channel_post.py from also running.
+ROOT BUG FIX (v3):
+    stop_propagation() moved to VERY END of quality_file_handler
+    so _process() actually runs before propagation is stopped.
 """
 
 import re
@@ -27,7 +25,7 @@ import traceback
 from dataclasses import dataclass, field
 
 from pyrogram import filters
-from pyrogram.types import Message
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from pyrogram.errors import FloodWait
 
 from bot import Bot
@@ -59,10 +57,11 @@ except Exception as _e:
 # ─────────────────────────────────────────────────────────
 @dataclass
 class QualitySession:
-    collected:     dict         = field(default_factory=dict)    # {key: Message}
+    collected:     dict         = field(default_factory=dict)   # {key: Message}
+    skipped:       set          = field(default_factory=set)    # {key, ...}
     lock:          asyncio.Lock = field(default_factory=asyncio.Lock)
     finished:      bool         = False
-    progress_msgs: list         = field(default_factory=list)    # track progress replies for deletion
+    progress_msgs: list         = field(default_factory=list)   # track replies for deletion
 
 quality_sessions: dict[int, QualitySession] = {}
 
@@ -122,12 +121,40 @@ def has_media(message: Message) -> bool:
     )
 
 
-def build_progress(collected: dict) -> str:
+def build_progress(collected: dict, skipped: set) -> str:
+    """Build progress text with ✅ collected, ⏭ skipped, ❌ pending."""
     lines = ["<b>Rᴇᴄᴇɪᴠᴇᴅ:</b>"]
     for key in QUALITY_ORDER:
-        icon = "✅" if key in collected else "❌"
+        if key in collected:
+            icon = "✅"
+        elif key in skipped:
+            icon = "⏭"
+        else:
+            icon = "❌"
         lines.append(f"{icon} {QUALITY_DISPLAY[key]}")
     return "\n".join(lines)
+
+
+def build_skip_keyboard(collected: dict, skipped: set, user_id: int) -> InlineKeyboardMarkup | None:
+    """
+    Build inline keyboard with Skip buttons only for qualities
+    that are neither collected nor already skipped.
+    Returns None if nothing left to skip.
+    """
+    buttons = []
+    for key in QUALITY_ORDER:
+        if key not in collected and key not in skipped:
+            buttons.append(
+                InlineKeyboardButton(
+                    f"⏭ Skip {QUALITY_DISPLAY[key]}",
+                    callback_data=f"qskip:{user_id}:{key}",
+                )
+            )
+    if not buttons:
+        return None
+    # 2 buttons per row
+    rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(rows)
 
 
 async def _gen_link(client: Bot, message: Message) -> str:
@@ -140,8 +167,8 @@ async def _gen_link(client: Bot, message: Message) -> str:
         await asyncio.sleep(wait)
         post = await message.copy(chat_id=client.db_channel.id, disable_notification=True)
 
-    cid  = post.id * abs(client.db_channel.id)
-    b64  = await encode(f"get-{cid}")
+    cid = post.id * abs(client.db_channel.id)
+    b64 = await encode(f"get-{cid}")
     return f"https://t.me/{client.username}?start={b64}"
 
 
@@ -152,8 +179,12 @@ def _clear(user_id: int) -> None:
 
 
 async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: Message) -> None:
-    """Generate links for all 4 qualities, delete progress msgs, send result, clear session."""
+    """
+    Generate links for collected qualities only,
+    delete all progress messages, send final result.
+    """
     snapshot   = dict(session.collected)
+    skipped    = set(session.skipped)
     saved_msgs = list(session.progress_msgs)   # snapshot before clear
     _clear(user_id)
 
@@ -164,9 +195,10 @@ async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: M
     try:
         links: dict[str, str] = {}
         for key in QUALITY_ORDER:
-            links[key] = await _gen_link(client, snapshot[key])
-            msg = f"[Quality] link  user={user_id}  {key} → {links[key]}"
-            logger.info(msg); print(msg)
+            if key in snapshot:                          # only collected, not skipped
+                links[key] = await _gen_link(client, snapshot[key])
+                msg = f"[Quality] link  user={user_id}  {key} → {links[key]}"
+                logger.info(msg); print(msg)
 
         # ── Delete all progress "Received:" messages ──────────────
         for pm in saved_msgs:
@@ -175,14 +207,17 @@ async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: M
             except Exception as del_err:
                 print(f"[Quality] could not delete progress msg: {del_err}")
 
-        # ── Final click-to-copy result ────────────────────────────
-        final = (
-            "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            f"<code>𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n 𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗪𝗘𝗕⑅𝗥𝗶𝗽 - {links['webrip']}</code> \n\n"
-            "<i>💡 Tap any link to copy</i>"
-        )
-        await status.edit(final, disable_web_page_preview=True)
-        msg = f"[Quality] Task done  user={user_id}"
+        # ── Build final message (only available qualities) ─────────
+        lines = ["<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n"]
+        for key in QUALITY_ORDER:
+            if key in links:
+                lines.append(f"<b>📌 {QUALITY_DISPLAY[key]}</b>\n<code>{links[key]}</code>\n")
+            elif key in skipped:
+                lines.append(f"<b>⏭ {QUALITY_DISPLAY[key]}</b> — Skipped\n")
+        lines.append("<i>💡 Tap any link to copy</i>")
+
+        await status.edit("\n".join(lines), disable_web_page_preview=True)
+        msg = f"[Quality] Task done  user={user_id}  links={list(links.keys())}  skipped={list(skipped)}"
         logger.info(msg); print(msg)
 
     except Exception as exc:
@@ -195,17 +230,15 @@ async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: M
 
 
 # ─────────────────────────────────────────────────────────
-#  Inner processing — separated so stop_propagation()
-#  can be called AFTER this returns in the outer handler.
+#  Inner processing
 # ─────────────────────────────────────────────────────────
 async def _process(client: Bot, message: Message, user_id: int, session: QualitySession) -> None:
-    """Detect quality, store file, send progress. Called inside quality_file_handler."""
+    """Detect quality, store file, send progress with skip buttons."""
 
     print(f"[Quality] _process called  user={user_id}  has_media={has_media(message)}")
 
     async with session.lock:
 
-        # Session might have been cancelled while waiting for lock
         if quality_sessions.get(user_id) is not session:
             print(f"[Quality] session changed/gone during lock wait  user={user_id}")
             return
@@ -254,22 +287,107 @@ async def _process(client: Bot, message: Message, user_id: int, session: Quality
             )
             return
 
+        if quality in session.skipped:
+            await message.reply(
+                f"⚠️ <b>{QUALITY_DISPLAY[quality]} ᴡᴀs sᴋɪᴘᴘᴇᴅ.</b> Send /quality to restart.",
+                quote=True,
+            )
+            return
+
         # ── Accept ────────────────────────────────────────────────
         session.collected[quality] = message
-        count = len(session.collected)
-        msg = f"[Quality] accepted  user={user_id}  quality={quality}  {count}/4  from='{matched}'"
+        total_done = len(session.collected) + len(session.skipped)
+        msg = f"[Quality] accepted  user={user_id}  quality={quality}  done={total_done}/4  from='{matched}'"
         logger.info(msg); print(msg)
 
-        # Save progress reply so we can delete it later
-        progress_reply = await message.reply(build_progress(session.collected), quote=True)
+        # Build progress text + skip keyboard for remaining qualities
+        progress_text = build_progress(session.collected, session.skipped)
+        keyboard      = build_skip_keyboard(session.collected, session.skipped, user_id)
+
+        progress_reply = await message.reply(
+            progress_text,
+            quote=True,
+            reply_markup=keyboard,
+        )
         session.progress_msgs.append(progress_reply)
 
-        if count == 4:
+        if total_done == 4:
             session.finished = True
 
-    # ── Outside lock: finish if all 4 collected ────────────────────
+    # ── Outside lock: finish if all 4 done ────────────────────────
     if session.finished and quality_sessions.get(user_id) is session:
         await _finish(client, session, user_id, message)
+
+
+# ═══════════════════════════════════════════════════════════
+#  Skip button callback handler
+# ═══════════════════════════════════════════════════════════
+@Bot.on_callback_query(filters.regex(r"^qskip:(\d+):(\w+)$"))
+async def quality_skip_callback(client: Bot, callback: CallbackQuery):
+    """Handles ⏭ Skip button taps from progress messages."""
+
+    match    = re.match(r"^qskip:(\d+):(\w+)$", callback.data)
+    owner_id = int(match.group(1))
+    quality  = match.group(2)
+    caller   = callback.from_user.id
+
+    # Only the session owner can press skip
+    if caller != owner_id:
+        await callback.answer("❌ Not your session!", show_alert=True)
+        return
+
+    session = quality_sessions.get(owner_id)
+
+    if session is None:
+        await callback.answer("⚠️ No active session.", show_alert=True)
+        return
+
+    if session.finished:
+        await callback.answer("⚠️ Already finished.", show_alert=True)
+        return
+
+    async with session.lock:
+
+        # Re-check inside lock
+        if quality_sessions.get(owner_id) is not session or session.finished:
+            await callback.answer("⚠️ Session changed.", show_alert=True)
+            return
+
+        if quality in session.collected:
+            await callback.answer(f"✅ {QUALITY_DISPLAY[quality]} already received!", show_alert=True)
+            return
+
+        if quality in session.skipped:
+            await callback.answer(f"⏭ {QUALITY_DISPLAY[quality]} already skipped.", show_alert=True)
+            return
+
+        # Mark as skipped
+        session.skipped.add(quality)
+        total_done = len(session.collected) + len(session.skipped)
+        msg = f"[Quality] skipped  user={owner_id}  quality={quality}  done={total_done}/4"
+        logger.info(msg); print(msg)
+
+        # Update the progress message with new state + updated keyboard
+        progress_text = build_progress(session.collected, session.skipped)
+        keyboard      = build_skip_keyboard(session.collected, session.skipped, owner_id)
+
+        try:
+            await callback.message.edit_text(
+                progress_text,
+                reply_markup=keyboard,
+            )
+        except Exception as edit_err:
+            print(f"[Quality] could not edit progress msg: {edit_err}")
+
+        await callback.answer(f"⏭ {QUALITY_DISPLAY[quality]} skipped!")
+
+        if total_done == 4:
+            session.finished = True
+
+    # ── Outside lock: finish if all 4 done ────────────────────────
+    if session.finished and quality_sessions.get(owner_id) is session:
+        # Use callback.message as trigger for the reply
+        await _finish(client, session, owner_id, callback.message)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -284,7 +402,8 @@ async def quality_cmd(client: Bot, message: Message):
     logger.info(msg); print(msg)
 
     await message.reply(
-        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• WEB-Rip",
+        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• WEB-Rip\n\n"
+        "<i>💡 Use Skip buttons if a quality is not available.</i>",
         quote=True,
     )
     message.stop_propagation()
@@ -345,6 +464,5 @@ async def quality_file_handler(client: Bot, message: Message):
             pass
 
     # ── THEN raise StopPropagation to block channel_post.py ───────
-    # (This is safe here because all awaits are done above.)
     print(f"[Quality] stopping propagation  user={user_id}")
     message.stop_propagation()
