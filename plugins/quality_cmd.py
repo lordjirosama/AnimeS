@@ -152,7 +152,7 @@ def _clear(user_id: int) -> None:
 
 async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: Message) -> None:
     """Generate links for all 4 qualities, send result, clear session."""
-    snapshot = dict(session.collected)   # snapshot before clear
+    snapshot = dict(session.collected)
     _clear(user_id)
 
     status = await trigger.reply(
@@ -166,9 +166,14 @@ async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: M
             msg = f"[Quality] link  user={user_id}  {key} → {links[key]}"
             logger.info(msg); print(msg)
 
+        # ── Click-to-copy format (tap <code> block to copy in Telegram) ──
         final = (
-            f"` 𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
-            f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗪𝗘𝗕-𝗥𝗶𝗽 - {links['webrip']} `"
+            "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
+            f"<b>📌 480p</b>\n<code>{links['480p']}</code>\n\n"
+            f"<b>📌 720p</b>\n<code>{links['720p']}</code>\n\n"
+            f"<b>📌 1080p</b>\n<code>{links['1080p']}</code>\n\n"
+            f"<b>📌 WEB-Rip</b>\n<code>{links['webrip']}</code>\n\n"
+            "<i>💡 Tap any link to copy</i>"
         )
         await status.edit(final, disable_web_page_preview=True)
         msg = f"[Quality] Task done  user={user_id}"
