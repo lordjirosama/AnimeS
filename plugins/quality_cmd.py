@@ -178,7 +178,7 @@ async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: M
         # ── Final click-to-copy result ────────────────────────────
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            f"<code>𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n 𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗪𝗘𝗕⑅𝗥𝗶𝗽 - {links['webrip']}</code>"
+            f"<code>𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n 𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗪𝗘𝗕⑅𝗥𝗶𝗽 - {links['webrip']}</code> \n\n"
             "<i>💡 Tap any link to copy</i>"
         )
         await status.edit(final, disable_web_page_preview=True)
