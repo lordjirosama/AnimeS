@@ -1,6 +1,13 @@
 """
-quality_cmd.py — /quality command  (v3 — ROOT BUG FIX)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+quality_cmd.py — /quality command  (v4 — PROGRESS MSG CLEANUP)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Changes in v4:
+    • All 4 progress "Received:" messages are deleted after task finishes
+    • Only the final click-to-copy links message remains
+    • progress_msgs list added to QualitySession to track replies
+    • Unicode bold text replaced with clean HTML bold (nano fix)
+    • Each link wrapped in <code> block for tap-to-copy in Telegram
 
 ROOT BUG (v1 & v2):
     message.stop_propagation() raises StopPropagation IMMEDIATELY.
@@ -8,17 +15,10 @@ ROOT BUG (v1 & v2):
     intercepted every file (blocking channel_post) but NEVER
     ran any detection/collection logic.
 
-FIX:
+FIX (v3+):
     stop_propagation() is now called at the VERY END of
     quality_file_handler, after _process() has fully completed.
     The exception then prevents channel_post.py from also running.
-
-Other improvements:
-    • print() at every step (visible in all log levels)
-    • extract ALL text: file_name + caption + message.text
-    • handles all media types (document/video/audio/animation/…)
-    • FloodWait compat:  e.value (new Pyrogram) / e.x (old Pyrogram)
-    • unknown quality reply now shows WHAT was checked → easy debug
 """
 
 import re
@@ -59,9 +59,10 @@ except Exception as _e:
 # ─────────────────────────────────────────────────────────
 @dataclass
 class QualitySession:
-    collected: dict = field(default_factory=dict)   # {key: Message}
-    lock:      asyncio.Lock = field(default_factory=asyncio.Lock)
-    finished:  bool = False
+    collected:     dict         = field(default_factory=dict)    # {key: Message}
+    lock:          asyncio.Lock = field(default_factory=asyncio.Lock)
+    finished:      bool         = False
+    progress_msgs: list         = field(default_factory=list)    # track progress replies for deletion
 
 quality_sessions: dict[int, QualitySession] = {}
 
@@ -151,8 +152,9 @@ def _clear(user_id: int) -> None:
 
 
 async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: Message) -> None:
-    """Generate links for all 4 qualities, send result, clear session."""
-    snapshot = dict(session.collected)
+    """Generate links for all 4 qualities, delete progress msgs, send result, clear session."""
+    snapshot   = dict(session.collected)
+    saved_msgs = list(session.progress_msgs)   # snapshot before clear
     _clear(user_id)
 
     status = await trigger.reply(
@@ -166,7 +168,14 @@ async def _finish(client: Bot, session: QualitySession, user_id: int, trigger: M
             msg = f"[Quality] link  user={user_id}  {key} → {links[key]}"
             logger.info(msg); print(msg)
 
-        # ── Click-to-copy format (tap <code> block to copy in Telegram) ──
+        # ── Delete all progress "Received:" messages ──────────────
+        for pm in saved_msgs:
+            try:
+                await pm.delete()
+            except Exception as del_err:
+                print(f"[Quality] could not delete progress msg: {del_err}")
+
+        # ── Final click-to-copy result ────────────────────────────
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
             f"<b>📌 480p</b>\n<code>{links['480p']}</code>\n\n"
@@ -254,7 +263,9 @@ async def _process(client: Bot, message: Message, user_id: int, session: Quality
         msg = f"[Quality] accepted  user={user_id}  quality={quality}  {count}/4  from='{matched}'"
         logger.info(msg); print(msg)
 
-        await message.reply(build_progress(session.collected), quote=True)
+        # Save progress reply so we can delete it later
+        progress_reply = await message.reply(build_progress(session.collected), quote=True)
+        session.progress_msgs.append(progress_reply)
 
         if count == 4:
             session.finished = True
@@ -340,3 +351,4 @@ async def quality_file_handler(client: Bot, message: Message):
     # (This is safe here because all awaits are done above.)
     print(f"[Quality] stopping propagation  user={user_id}")
     message.stop_propagation()
+        
