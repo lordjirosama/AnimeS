@@ -216,11 +216,14 @@ async def _q_finish(
 
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            f"<code>𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
-            f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗛𝗗𝗥𝗶𝗽 - {links['hdrip']}</code>\n\n"
-            "<i>💡 Tap any link to copy</i>"
+            "<code>"
+            f"480p - {links['480p']}\n"
+            f"720p - {links['720p']}\n"
+            f"1080p - {links['1080p']}\n"
+            f"HDRip - {links['hdrip']}"
+            "</code>\n\n"
+            "<i>💡 Tap to copy all links</i>"
         )
-    
         await status.edit(final, disable_web_page_preview=True)
         msg = f"[Quality] Task done  user={user_id}"
         logger.info(msg); print(msg)
@@ -417,14 +420,11 @@ async def _sq_finish(
 
         await _delete_progress(saved_msgs)
 
-        link_lines = "".join(
-            f"<b>{QUALITY_DISPLAY[k]}</b>\n<code>{links[k]}</code>\n\n"
-            for k in required
-        )
+        parts = " && ".join(f"{QUALITY_DISPLAY[k]} - {links[k]}" for k in required)
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            f"{link_lines}"
-            "<i>💡 Tap any link to copy</i>"
+            f"<code>{parts}</code>\n\n"
+            "<i>💡 Tap to copy all links</i>"
         )
         await status.edit(final, disable_web_page_preview=True)
         msg = f"[SQuality] Task done  user={user_id}"
