@@ -2,7 +2,7 @@
 quality_cmd.py — /quality + /squality commands  (v5 — COMBINED)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/quality   — Collect all 4 qualities (480p, 720p, 1080p, WEB-Rip)
+/quality   — Collect all 4 qualities (480p, 720p, 1080p, HDRip)
 /squality  — Admin selects which qualities to SKIP via inline
              buttons, then sends only the required files.
 
@@ -65,14 +65,14 @@ except Exception as _e:
 # ─────────────────────────────────────────────────────────
 #  Shared constants
 # ─────────────────────────────────────────────────────────
-QUALITY_ORDER = ["480p", "720p", "1080p", "webrip"]
+QUALITY_ORDER = ["480p", "720p", "1080p", "hdrip"]
 QUALITY_DISPLAY = {
     "480p":   "480p",
     "720p":   "720p",
     "1080p":  "1080p",
-    "webrip": "WEB-Rip",
+    "hdrip": "HDRip",
 }
-_WEB_RE = re.compile(r'\b(webrip|web[\s\-]rip|web)\b', re.IGNORECASE)
+_WEB_RE = re.compile(r'\b(hdrip|hd[\s\-]rip|hdtv)\b', re.IGNORECASE)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -121,7 +121,7 @@ def detect_quality(text: str) -> str | None:
     if "1080p" in t: return "1080p"
     if "720p"  in t: return "720p"
     if "480p"  in t: return "480p"
-    if _WEB_RE.search(t): return "webrip"
+    if _WEB_RE.search(t): return "hdrip"
     return None
 
 
@@ -216,9 +216,13 @@ async def _q_finish(
 
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            f"<code>𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
-            f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗪𝗘𝗕⑅𝗥𝗶𝗽 - {links['webrip']}</code>\n\n"
-            "<i>💡 Tap any link to copy</i>"
+            "<code>"
+            f"480p - {links['480p']}\n"
+            f"720p - {links['720p']}\n"
+            f"1080p - {links['1080p']}\n"
+            f"HDRip - {links['hdrip']}"
+            "</code>\n\n"
+            "<i>💡 Tap to copy all links</i>"
         )
         await status.edit(final, disable_web_page_preview=True)
         msg = f"[Quality] Task done  user={user_id}"
@@ -275,7 +279,7 @@ async def _q_process(
             await message.reply(
                 f"⚠️ <b>Uɴᴋɴᴏᴡɴ ǫᴜᴀʟɪᴛʏ.</b>\n"
                 f"<b>Checked:</b> <code>{preview}</code>\n"
-                f"<i>Need 480p / 720p / 1080p / WEBRip / WEB-Rip in filename or caption.</i>",
+                f"<i>Need 480p / 720p / 1080p / HDRip / HD-Rip in filename or caption.</i>",
                 quote=True,
             )
             return
@@ -313,7 +317,7 @@ async def quality_cmd(client: Bot, message: Message):
     logger.info(msg); print(msg)
 
     await message.reply(
-        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• WEB-Rip",
+        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• HDRip",
         quote=True,
     )
     message.stop_propagation()
@@ -416,13 +420,14 @@ async def _sq_finish(
 
         await _delete_progress(saved_msgs)
 
-        parts     = [f"{QUALITY_DISPLAY[k]} - {links[k]}" for k in required]
-        link_line = " && ".join(parts)
-
+        link_lines = "".join(
+            f"<b>{QUALITY_DISPLAY[k]}</b>\n<code>{links[k]}</code>\n\n"
+            for k in required
+        )
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            f"<code>{link_line}</code>\n\n"
-            "<i>💡 Tap to copy</i>"
+            f"{link_lines}"
+            "<i>💡 Tap any link to copy</i>"
         )
         await status.edit(final, disable_web_page_preview=True)
         msg = f"[SQuality] Task done  user={user_id}"
@@ -479,7 +484,7 @@ async def _sq_process(
             await message.reply(
                 f"⚠️ <b>Uɴᴋɴᴏᴡɴ ǫᴜᴀʟɪᴛʏ.</b>\n"
                 f"<b>Checked:</b> <code>{preview}</code>\n"
-                f"<i>Need 480p / 720p / 1080p / WEBRip / WEB-Rip in filename or caption.</i>",
+                f"<i>Need 480p / 720p / 1080p / HDRip / HD-Rip in filename or caption.</i>",
                 quote=True,
             )
             return
@@ -551,15 +556,20 @@ async def squality_cmd(client: Bot, message: Message):
     message.stop_propagation()
 
 
-@Bot.on_callback_query(filters.regex(r"^sq(toggle_|confirm)") & is_admin)
+@Bot.on_callback_query(filters.regex(r"^sq(toggle_|confirm)") & is_admin, group=-1)
 async def squality_callback(client: Bot, query: CallbackQuery):
     user_id = query.from_user.id
+    print(f"[SQuality] CALLBACK ENTRY  user={user_id}  data={query.data}")
+
     session = squality_sessions.get(user_id)
+    print(f"[SQuality] session_found={session is not None}  confirmed={session.confirmed if session else 'N/A'}")
 
     if not session:
+        print(f"[SQuality] No session for user={user_id}")
         await query.answer("⚠️ Koi active /squality session nahi.", show_alert=True)
         return
     if session.confirmed:
+        print(f"[SQuality] Session already confirmed  user={user_id}")
         await query.answer("✅ Session confirmed! Files bhejo.", show_alert=True)
         return
 
@@ -567,24 +577,31 @@ async def squality_callback(client: Bot, query: CallbackQuery):
 
     if data.startswith("sqtoggle_"):
         key = data[len("sqtoggle_"):]
+        print(f"[SQuality] TOGGLE  user={user_id}  key={key}  skipped_before={set(session.skipped)}")
         if key in session.skipped:
             session.skipped.discard(key)
+            print(f"[SQuality] Included {key}  skipped_now={set(session.skipped)}")
             await query.answer(f"✅ {QUALITY_DISPLAY[key]} include hoga")
         else:
             if len(session.skipped) >= len(QUALITY_ORDER) - 1:
+                print(f"[SQuality] Cannot skip all qualities  user={user_id}")
                 await query.answer(
                     "⚠️ Kam se kam ek quality include honi chahiye!",
                     show_alert=True,
                 )
                 return
             session.skipped.add(key)
+            print(f"[SQuality] Skipped {key}  skipped_now={set(session.skipped)}")
             await query.answer(f"❌ {QUALITY_DISPLAY[key]} skip hoga")
         await query.edit_message_reply_markup(_sq_build_skip_keyboard(session.skipped))
+        print(f"[SQuality] Keyboard updated  user={user_id}")
 
     elif data == "sqconfirm":
+        print(f"[SQuality] CONFIRM pressed  user={user_id}")
         required = [k for k in QUALITY_ORDER if k not in session.skipped]
         session.required  = required
         session.confirmed = True
+        print(f"[SQuality] required={required}  skipped={list(session.skipped)}")
 
         skipped_names  = [QUALITY_DISPLAY[k] for k in session.skipped] if session.skipped else ["Koi nahi (sab include)"]
         required_names = [QUALITY_DISPLAY[k] for k in required]
@@ -600,6 +617,9 @@ async def squality_callback(client: Bot, query: CallbackQuery):
 
         msg = f"[SQuality] Confirmed  user={user_id}  required={required}  skipped={list(session.skipped)}"
         logger.info(msg); print(msg)
+    
+    else:
+        print(f"[SQuality] UNKNOWN callback data={data}  user={user_id}")
 
 
 @Bot.on_message(filters.command("cancel") & filters.private & is_admin, group=-2)
