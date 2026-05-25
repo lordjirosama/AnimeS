@@ -1,7 +1,7 @@
 """
 quality_cmd.py — /quality + /squality commands  (v5 — COMBINED)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ggg
+
 /quality   — Collect all 4 qualities (480p, 720p, 1080p, WEB-Rip)
 /squality  — Admin selects which qualities to SKIP via inline
              buttons, then sends only the required files.
