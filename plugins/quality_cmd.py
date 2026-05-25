@@ -224,8 +224,18 @@ async def _q_finish(
         )
       
         await status.edit(final, disable_web_page_preview=True)
+
+        # ── Sticker → DB channel ──
+        STICKER_ID = "CAACAgUAAxkBAAEELHFqFF0J-M_mVmH8DrHnW2Z1sNSCDwACrQ4AAjgYiVVugCWAZf8h6DsE"
+        try:
+            await client.send_sticker(chat_id=client.db_channel.id, sticker=STICKER_ID)
+            print(f"[Quality] Sticker sent to DB channel  user={user_id}")
+        except Exception as stk_err:
+            print(f"[Quality] Sticker send failed: {stk_err}")
+
         msg = f"[Quality] Task done  user={user_id}"
         logger.info(msg); print(msg)
+      
 
     except Exception as exc:
         tb = traceback.format_exc()
@@ -426,9 +436,18 @@ async def _sq_finish(
             "<i>💡 Tap to copy all links</i>"
         )
         await status.edit(final, disable_web_page_preview=True)
+
+        # ── Sticker → DB channel ──
+        STICKER_ID = "CAACAgUAAxkBAAEELHFqFF0J-M_mVmH8DrHnW2Z1sNSCDwACrQ4AAjgYiVVugCWAZf8h6DsE"
+        try:
+            await client.send_sticker(chat_id=client.db_channel.id, sticker=STICKER_ID)
+            print(f"[SQuality] Sticker sent to DB channel  user={user_id}")
+        except Exception as stk_err:
+            print(f"[SQuality] Sticker send failed: {stk_err}")
+
         msg = f"[SQuality] Task done  user={user_id}"
         logger.info(msg); print(msg)
-
+      
     except Exception as exc:
         tb = traceback.format_exc()
         logger.error(f"[SQuality] _finish error  user={user_id}: {exc}")
