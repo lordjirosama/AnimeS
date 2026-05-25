@@ -217,11 +217,12 @@ async def _q_finish(
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
             "<code>"
-            f"480p - {links['480p']} && 720p - {links['720p']}\n"
-            f"1080p - {links['1080p']} && HDRip - {links['hdrip']}"
+            f"𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
+            f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗛𝗗𝗿𝗶𝗽 - {links['hdrip']}"
             "</code>\n\n"
             "<i>💡 Tap to copy all links</i>"
         )
+      
         await status.edit(final, disable_web_page_preview=True)
         msg = f"[Quality] Task done  user={user_id}"
         logger.info(msg); print(msg)
