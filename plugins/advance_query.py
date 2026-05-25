@@ -1,669 +1,621 @@
-"""
-quality_cmd.py — /quality + /squality commands  (v5 — COMBINED)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-/quality   — Collect all 4 qualities (480p, 720p, 1080p, WEB-Rip)
-/squality  — Admin selects which qualities to SKIP via inline
-             buttons, then sends only the required files.
-
-Both commands:
-    • Delete all "Received:" progress messages after task finishes
-    • Send one final tap-to-copy links message
-    • Support /cancel to abort active session
-    • Use stop_propagation() AFTER processing (v3+ fix)
-
-Group assignments:
-    /squality handlers → group=-2  (runs first)
-    /quality  handlers → group=-1  (runs after)
-    File handler at each group only fires for its own session type.
-"""
-
-import re
-import asyncio
-import traceback
-from dataclasses import dataclass, field
-
-from pyrogram import filters
-from pyrogram.types import (
-    Message,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    CallbackQuery,
-)
-from pyrogram.errors import FloodWait
-
+import random
 from bot import Bot
-from helper_func import is_admin, encode
-from config import LOGGER
-
-logger = LOGGER(__name__)
-
-
-# ─────────────────────────────────────────────────────────
-#  Command list  (keep in sync with channel_post.py)
-# ─────────────────────────────────────────────────────────
-try:
-    from plugins.channel_post import command_list as _CMD_LIST
-    _CMD_LIST = list(_CMD_LIST)
-    for _cmd in ("quality", "squality"):
-        if _cmd not in _CMD_LIST:
-            _CMD_LIST.append(_cmd)
-    print("[Quality] imported command_list from channel_post.py")
-except Exception as _e:
-    print(f"[Quality] could not import command_list ({_e}), using fallback")
-    _CMD_LIST = [
-        'start', 'users', 'broadcast', 'batch', 'genlink', 'help', 'cmd',
-        'info', 'add_fsub', 'fsub_chnl', 'restart', 'del_fsub', 'add_admins',
-        'del_admins', 'admin_list', 'cancel', 'auto_del', 'forcesub', 'files',
-        'add_banuser', 'del_banuser', 'banuser_list', 'status', 'search',
-        'req_fsub', 'setexpire', 'setjoinmode', 'approvegroup',
-        'disapprovegroup', 'index', 'setsearchmode', 'flink',
-        'quality', 'squality',
-    ]
+from plugins.FORMATS import *
+from config import OWNER_ID, PICS
+from pyrogram.enums import ChatAction
+from plugins.autoDelete import convert_time
+from database.database import kingdb
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto, ReplyKeyboardMarkup, ReplyKeyboardRemove    
 
 
-# ─────────────────────────────────────────────────────────
-#  Shared constants
-# ─────────────────────────────────────────────────────────
-QUALITY_ORDER = ["480p", "720p", "1080p", "webrip"]
-QUALITY_DISPLAY = {
-    "480p":   "480p",
-    "720p":   "720p",
-    "1080p":  "1080p",
-    "webrip": "WEB-Rip",
-}
-_WEB_RE = re.compile(r'\b(webrip|web[\s\-]rip|web)\b', re.IGNORECASE)
-
-
-# ═══════════════════════════════════════════════════════════
-#  SESSION MODELS
-# ═══════════════════════════════════════════════════════════
-
-@dataclass
-class QualitySession:
-    """Session for /quality — always collects all 4."""
-    collected:     dict         = field(default_factory=dict)
-    lock:          asyncio.Lock = field(default_factory=asyncio.Lock)
-    finished:      bool         = False
-    progress_msgs: list         = field(default_factory=list)
-
-
-@dataclass
-class SQualitySession:
-    """Session for /squality — admin picks which to skip."""
-    # Selection phase
-    skipped:       set          = field(default_factory=set)
-    confirmed:     bool         = False
-    select_msg:    object       = None
-
-    # Collection phase
-    required:      list         = field(default_factory=list)
-    collected:     dict         = field(default_factory=dict)
-    lock:          asyncio.Lock = field(default_factory=asyncio.Lock)
-    finished:      bool         = False
-    progress_msgs: list         = field(default_factory=list)
-
-
-# Global session registries
-quality_sessions:  dict[int, QualitySession]  = {}
-squality_sessions: dict[int, SQualitySession] = {}
-
-
-# ═══════════════════════════════════════════════════════════
-#  SHARED HELPERS
-# ═══════════════════════════════════════════════════════════
-
-def detect_quality(text: str) -> str | None:
-    """Return canonical quality key or None."""
-    if not text:
-        return None
-    t = text.lower()
-    if "1080p" in t: return "1080p"
-    if "720p"  in t: return "720p"
-    if "480p"  in t: return "480p"
-    if _WEB_RE.search(t): return "webrip"
-    return None
-
-
-def extract_all_text(message: Message) -> list[str]:
-    """Collect text from: media filename → caption → message text."""
-    sources: list[str] = []
-    for attr in ("document", "video", "audio", "animation", "voice", "video_note"):
-        media = getattr(message, attr, None)
-        if media:
-            fn = getattr(media, "file_name", None)
-            if fn:
-                sources.append(fn)
-    if message.caption:
-        sources.append(message.caption)
-    if message.text:
-        sources.append(message.text)
-    return sources
-
-
-def has_media(message: Message) -> bool:
-    return bool(
-        message.document or message.video or message.audio or
-        message.animation or message.voice or message.video_note or
-        message.photo or message.sticker
-    )
-
-
-async def _gen_link(client: Bot, message: Message) -> str:
-    """Copy to DB channel → return bot start-link."""
+#File setting function for retriveing modes and state of file related setting
+async def fileSettings(getfunc, setfunc=None, delfunc=False) :
+    btn_mode, txt_mode, pic_mode = '❌', off_txt, off_pic
+    del_btn_mode = 'Eɴᴀʙʟᴇ Mᴏᴅᴇ ✅'
     try:
-        post = await message.copy(chat_id=client.db_channel.id, disable_notification=True)
-    except FloodWait as e:
-        wait = getattr(e, "value", getattr(e, "x", 5))
-        print(f"[Quality] FloodWait {wait}s")
-        await asyncio.sleep(wait)
-        post = await message.copy(chat_id=client.db_channel.id, disable_notification=True)
-
-    cid = post.id * abs(client.db_channel.id)
-    b64 = await encode(f"get-{cid}")
-    return f"https://t.me/{client.username}?start={b64}"
-
-
-async def _delete_progress(msgs: list) -> None:
-    """Delete all progress reply messages silently."""
-    for pm in msgs:
-        try:
-            await pm.delete()
-        except Exception as del_err:
-            print(f"[Quality] could not delete progress msg: {del_err}")
-
-
-# ═══════════════════════════════════════════════════════════
-#  ░░░  /quality  ░░░
-# ═══════════════════════════════════════════════════════════
-
-def _q_build_progress(collected: dict) -> str:
-    lines = ["<b>Rᴇᴄᴇɪᴠᴇᴅ:</b>"]
-    for key in QUALITY_ORDER:
-        icon = "✅" if key in collected else "❌"
-        lines.append(f"{icon} {QUALITY_DISPLAY[key]}")
-    return "\n".join(lines)
-
-
-def _q_clear(user_id: int) -> None:
-    quality_sessions.pop(user_id, None)
-    msg = f"[Quality] Session cleared  user={user_id}"
-    logger.info(msg); print(msg)
-
-
-async def _q_finish(
-    client:  Bot,
-    session: QualitySession,
-    user_id: int,
-    trigger: Message,
-) -> None:
-    snapshot   = dict(session.collected)
-    saved_msgs = list(session.progress_msgs)
-    _q_clear(user_id)
-
-    status = await trigger.reply(
-        "<b><i>⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ ʟɪɴᴋs...</i></b>",
-        disable_web_page_preview=True,
-    )
-    try:
-        links: dict[str, str] = {}
-        for key in QUALITY_ORDER:
-            links[key] = await _gen_link(client, snapshot[key])
-            msg = f"[Quality] link  user={user_id}  {key} → {links[key]}"
-            logger.info(msg); print(msg)
-
-        await _delete_progress(saved_msgs)
-
-        final = (
-            "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            "<code>"
-            f"480p - {links['480p']}\n"
-            f"720p - {links['720p']}\n"
-            f"1080p - {links['1080p']}\n"
-            f"WEB-Rip - {links['webrip']}"
-            "</code>\n\n"
-            "<i>💡 Tap to copy all links</i>"
-        )
-        await status.edit(final, disable_web_page_preview=True)
-        msg = f"[Quality] Task done  user={user_id}"
-        logger.info(msg); print(msg)
-
-    except Exception as exc:
-        tb = traceback.format_exc()
-        logger.error(f"[Quality] _finish error  user={user_id}: {exc}")
-        print(f"[Quality] _finish error  user={user_id}: {exc}\n{tb}")
-        await status.edit(
-            f"<b>❌ Eʀʀᴏʀ:</b>\n<blockquote><code>{exc}</code></blockquote>"
-        )
-
-
-async def _q_process(
-    client:  Bot,
-    message: Message,
-    user_id: int,
-    session: QualitySession,
-) -> None:
-    print(f"[Quality] _process called  user={user_id}  has_media={has_media(message)}")
-
-    async with session.lock:
-
-        if quality_sessions.get(user_id) is not session:
-            print(f"[Quality] session changed/gone  user={user_id}")
-            return
-        if session.finished:
-            print(f"[Quality] already finished  user={user_id}")
-            return
-
-        if not has_media(message):
-            await message.reply(
-                "⚠️ <b>Pʟᴇᴀsᴇ sᴇɴᴅ ᴀ ғɪʟᴇ</b> (document, video, etc.)",
-                quote=True,
-            )
-            return
-
-        sources = extract_all_text(message)
-        quality = None
-        matched = None
-        for src in sources:
-            q = detect_quality(src)
-            if q:
-                quality = q
-                matched = src
-                break
-
-        print(f"[Quality] detection  user={user_id}  sources={sources}  result={quality}")
-        logger.info(f"[Quality] detection  user={user_id}  sources={sources}  result={quality}")
-
-        if quality is None:
-            preview = ", ".join(repr(s[:50]) for s in sources) if sources else "NONE FOUND"
-            await message.reply(
-                f"⚠️ <b>Uɴᴋɴᴏᴡɴ ǫᴜᴀʟɪᴛʏ.</b>\n"
-                f"<b>Checked:</b> <code>{preview}</code>\n"
-                f"<i>Need 480p / 720p / 1080p / WEBRip / WEB-Rip in filename or caption.</i>",
-                quote=True,
-            )
-            return
-
-        if quality in session.collected:
-            await message.reply(
-                f"⚠️ <b>{QUALITY_DISPLAY[quality]} ᴀʟʀᴇᴀᴅʏ ᴀᴅᴅᴇᴅ.</b>",
-                quote=True,
-            )
-            return
-
-        session.collected[quality] = message
-        count = len(session.collected)
-        msg = f"[Quality] accepted  user={user_id}  quality={quality}  {count}/4  from='{matched}'"
-        logger.info(msg); print(msg)
-
-        progress_reply = await message.reply(_q_build_progress(session.collected), quote=True)
-        session.progress_msgs.append(progress_reply)
-
-        if count == 4:
-            session.finished = True
-
-    if session.finished and quality_sessions.get(user_id) is session:
-        await _q_finish(client, session, user_id, message)
-
-
-# ───────────────────────────── /quality handlers ──────────
-
-@Bot.on_message(filters.command("quality") & filters.private & is_admin, group=-1)
-async def quality_cmd(client: Bot, message: Message):
-    user_id = message.from_user.id
-    _q_clear(user_id)
-    quality_sessions[user_id] = QualitySession()
-    msg = f"[Quality] Session started  user={user_id}"
-    logger.info(msg); print(msg)
-
-    await message.reply(
-        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• WEB-Rip",
-        quote=True,
-    )
-    message.stop_propagation()
-
-
-@Bot.on_message(filters.command("cancel") & filters.private & is_admin, group=-1)
-async def quality_cancel(client: Bot, message: Message):
-    user_id = message.from_user.id
-    if user_id in quality_sessions:
-        _q_clear(user_id)
-        print(f"[Quality] Cancelled  user={user_id}")
-        await message.reply("<b>✅ Qᴜᴀʟɪᴛʏ ᴛᴀsᴋ ᴄᴀɴᴄᴇʟʟᴇᴅ.</b>", quote=True)
-        message.stop_propagation()
-
-
-@Bot.on_message(
-    ~filters.command(_CMD_LIST) & filters.private & is_admin,
-    group=-1,
-)
-async def quality_file_handler(client: Bot, message: Message):
-    user_id = message.from_user.id
-    print(f"[Quality] HANDLER ENTRY  user={user_id}  session_active={user_id in quality_sessions}")
-
-    if user_id not in quality_sessions:
-        return
-
-    session = quality_sessions[user_id]
-
-    try:
-        await _q_process(client, message, user_id, session)
-    except Exception as exc:
-        tb = traceback.format_exc()
-        logger.error(f"[Quality] handler error  user={user_id}: {exc}")
-        print(f"[Quality] handler error  user={user_id}: {exc}\n{tb}")
-        try:
-            await message.reply(f"<b>❌ Eʀʀᴏʀ:</b>\n<code>{exc}</code>", quote=True)
-        except Exception:
-            pass
-
-    print(f"[Quality] stopping propagation  user={user_id}")
-    message.stop_propagation()
-
-
-# ═══════════════════════════════════════════════════════════
-#  ░░░  /squality  ░░░
-# ═══════════════════════════════════════════════════════════
-
-def _sq_build_skip_keyboard(skipped: set) -> InlineKeyboardMarkup:
-    """4 toggle buttons (2 per row) + Confirm."""
-    rows = []
-    row  = []
-    for key in QUALITY_ORDER:
-        icon  = "❌" if key in skipped else "✅"
-        label = f"{icon} {QUALITY_DISPLAY[key]}"
-        row.append(InlineKeyboardButton(label, callback_data=f"sqtoggle_{key}"))
-        if len(row) == 2:
-            rows.append(row)
-            row = []
-    if row:
-        rows.append(row)
-    rows.append([InlineKeyboardButton("✔️ Cᴏɴғɪʀᴍ", callback_data="sqconfirm")])
-    return InlineKeyboardMarkup(rows)
-
-
-def _sq_build_progress(collected: dict, required: list) -> str:
-    lines = ["<b>Rᴇᴄᴇɪᴠᴇᴅ:</b>"]
-    for key in required:
-        icon = "✅" if key in collected else "❌"
-        lines.append(f"{icon} {QUALITY_DISPLAY[key]}")
-    return "\n".join(lines)
-
-
-def _sq_clear(user_id: int) -> None:
-    squality_sessions.pop(user_id, None)
-    msg = f"[SQuality] Session cleared  user={user_id}"
-    logger.info(msg); print(msg)
-
-
-async def _sq_finish(
-    client:  Bot,
-    session: SQualitySession,
-    user_id: int,
-    trigger: Message,
-) -> None:
-    snapshot   = dict(session.collected)
-    required   = list(session.required)
-    saved_msgs = list(session.progress_msgs)
-    _sq_clear(user_id)
-
-    status = await trigger.reply(
-        "<b><i>⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ ʟɪɴᴋs...</i></b>",
-        disable_web_page_preview=True,
-    )
-    try:
-        links: dict[str, str] = {}
-        for key in required:
-            links[key] = await _gen_link(client, snapshot[key])
-            msg = f"[SQuality] link  user={user_id}  {key} → {links[key]}"
-            logger.info(msg); print(msg)
-
-        await _delete_progress(saved_msgs)
-
-        link_lines = "".join(
-            f"<b>{QUALITY_DISPLAY[k]}</b>\n<code>{links[k]}</code>\n\n"
-            for k in required
-        )
-        final = (
-            "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            f"{link_lines}"
-            "<i>💡 Tap any link to copy</i>"
-        )
-        await status.edit(final, disable_web_page_preview=True)
-        msg = f"[SQuality] Task done  user={user_id}"
-        logger.info(msg); print(msg)
-
-    except Exception as exc:
-        tb = traceback.format_exc()
-        logger.error(f"[SQuality] _finish error  user={user_id}: {exc}")
-        print(f"[SQuality] _finish error  user={user_id}: {exc}\n{tb}")
-        await status.edit(
-            f"<b>❌ Eʀʀᴏʀ:</b>\n<blockquote><code>{exc}</code></blockquote>"
-        )
-
-
-async def _sq_process(
-    client:  Bot,
-    message: Message,
-    user_id: int,
-    session: SQualitySession,
-) -> None:
-    print(f"[SQuality] _process called  user={user_id}  has_media={has_media(message)}")
-
-    async with session.lock:
-
-        if squality_sessions.get(user_id) is not session:
-            print(f"[SQuality] session changed/gone  user={user_id}")
-            return
-        if session.finished:
-            print(f"[SQuality] already finished  user={user_id}")
-            return
-
-        if not has_media(message):
-            await message.reply(
-                "⚠️ <b>Pʟᴇᴀsᴇ sᴇɴᴅ ᴀ ғɪʟᴇ</b> (document, video, etc.)",
-                quote=True,
-            )
-            return
-
-        sources = extract_all_text(message)
-        quality = None
-        matched = None
-        for src in sources:
-            q = detect_quality(src)
-            if q:
-                quality = q
-                matched = src
-                break
-
-        print(f"[SQuality] detection  user={user_id}  sources={sources}  result={quality}")
-        logger.info(f"[SQuality] detection  user={user_id}  sources={sources}  result={quality}")
-
-        if quality is None:
-            preview = ", ".join(repr(s[:50]) for s in sources) if sources else "NONE FOUND"
-            await message.reply(
-                f"⚠️ <b>Uɴᴋɴᴏᴡɴ ǫᴜᴀʟɪᴛʏ.</b>\n"
-                f"<b>Checked:</b> <code>{preview}</code>\n"
-                f"<i>Need 480p / 720p / 1080p / WEBRip / WEB-Rip in filename or caption.</i>",
-                quote=True,
-            )
-            return
-
-        if quality in session.skipped:
-            await message.reply(
-                f"⚠️ <b>{QUALITY_DISPLAY[quality]}</b> ᴡᴀs sᴋɪᴘᴘᴇᴅ ɪɴ ᴛʜɪs sᴇssɪᴏɴ.\n"
-                f"<i>Only send: {', '.join(QUALITY_DISPLAY[k] for k in session.required)}</i>",
-                quote=True,
-            )
-            return
-
-        if quality not in session.required:
-            await message.reply(
-                f"⚠️ <b>{QUALITY_DISPLAY[quality]}</b> ɪs ɴᴏᴛ ɪɴ ʀᴇǫᴜɪʀᴇᴅ ʟɪsᴛ.",
-                quote=True,
-            )
-            return
-
-        if quality in session.collected:
-            await message.reply(
-                f"⚠️ <b>{QUALITY_DISPLAY[quality]} ᴀʟʀᴇᴀᴅʏ ᴀᴅᴅᴇᴅ.</b>",
-                quote=True,
-            )
-            return
-
-        session.collected[quality] = message
-        count = len(session.collected)
-        msg = (
-            f"[SQuality] accepted  user={user_id}  quality={quality}  "
-            f"{count}/{len(session.required)}  from='{matched}'"
-        )
-        logger.info(msg); print(msg)
-
-        progress_reply = await message.reply(
-            _sq_build_progress(session.collected, session.required),
-            quote=True,
-        )
-        session.progress_msgs.append(progress_reply)
-
-        if count == len(session.required):
-            session.finished = True
-
-    if session.finished and squality_sessions.get(user_id) is session:
-        await _sq_finish(client, session, user_id, message)
-
-
-# ───────────────────────────── /squality handlers ─────────
-
-@Bot.on_message(filters.command("squality") & filters.private & is_admin, group=-2)
-async def squality_cmd(client: Bot, message: Message):
-    user_id = message.from_user.id
-    _sq_clear(user_id)
-    session = SQualitySession()
-    squality_sessions[user_id] = session
-
-    msg = f"[SQuality] Session started  user={user_id}"
-    logger.info(msg); print(msg)
-
-    sent = await message.reply(
-        "<b>Kᴏɴ ᴋᴏɴ sᴀ ǫᴜᴀʟɪᴛʏ sᴋɪᴘ ᴋᴀʀɴᴀ ʜᴀɪ?</b>\n\n"
-        "✅ = Cᴏʟʟᴇᴄᴛ ᴋᴀʀᴇɢᴀ\n"
-        "❌ = Sᴋɪᴘ ʜᴏ ᴊᴀʏᴇɢᴀ\n\n"
-        "<i>Quality tap karo toggle karne ke liye, fir <b>Confirm</b> dabao.</i>",
-        reply_markup=_sq_build_skip_keyboard(session.skipped),
-        quote=True,
-    )
-    session.select_msg = sent
-    message.stop_propagation()
-
-
-@Bot.on_callback_query(filters.regex(r"^sq(toggle_|confirm)") & is_admin, group=-1)
-async def squality_callback(client: Bot, query: CallbackQuery):
-    user_id = query.from_user.id
-    print(f"[SQuality] CALLBACK ENTRY  user={user_id}  data={query.data}")
-
-    session = squality_sessions.get(user_id)
-    print(f"[SQuality] session_found={session is not None}  confirmed={session.confirmed if session else 'N/A'}")
-
-    if not session:
-        print(f"[SQuality] No session for user={user_id}")
-        await query.answer("⚠️ Koi active /squality session nahi.", show_alert=True)
-        return
-    if session.confirmed:
-        print(f"[SQuality] Session already confirmed  user={user_id}")
-        await query.answer("✅ Session confirmed! Files bhejo.", show_alert=True)
-        return
-
-    data = query.data
-
-    if data.startswith("sqtoggle_"):
-        key = data[len("sqtoggle_"):]
-        print(f"[SQuality] TOGGLE  user={user_id}  key={key}  skipped_before={set(session.skipped)}")
-        if key in session.skipped:
-            session.skipped.discard(key)
-            print(f"[SQuality] Included {key}  skipped_now={set(session.skipped)}")
-            await query.answer(f"✅ {QUALITY_DISPLAY[key]} include hoga")
+        if not setfunc:
+            if await getfunc():
+                txt_mode = on_txt    
+                btn_mode = '✅'
+                del_btn_mode = 'Dɪsᴀʙʟᴇ Mᴏᴅᴇ ❌'
+        
+            return txt_mode, (del_btn_mode if delfunc else btn_mode)
+            
         else:
-            if len(session.skipped) >= len(QUALITY_ORDER) - 1:
-                print(f"[SQuality] Cannot skip all qualities  user={user_id}")
-                await query.answer(
-                    "⚠️ Kam se kam ek quality include honi chahiye!",
-                    show_alert=True,
-                )
-                return
-            session.skipped.add(key)
-            print(f"[SQuality] Skipped {key}  skipped_now={set(session.skipped)}")
-            await query.answer(f"❌ {QUALITY_DISPLAY[key]} skip hoga")
-        await query.edit_message_reply_markup(_sq_build_skip_keyboard(session.skipped))
-        print(f"[SQuality] Keyboard updated  user={user_id}")
+            if await getfunc():
+                await setfunc(False)
+            else:
+                await setfunc(True)
+                pic_mode, txt_mode = on_pic, on_txt
+                btn_mode = '✅'
+                del_btn_mode = 'Dɪsᴀʙʟᴇ Mᴏᴅᴇ ❌'
+                
+            return pic_mode, txt_mode, (del_btn_mode if delfunc else btn_mode)
+            
+    except Exception as e:
+        print(f"Error occured at [fileSettings(getfunc, setfunc=None, delfunc=False)] : {e}")
 
-    elif data == "sqconfirm":
-        print(f"[SQuality] CONFIRM pressed  user={user_id}")
-        required = [k for k in QUALITY_ORDER if k not in session.skipped]
-        session.required  = required
-        session.confirmed = True
-        print(f"[SQuality] required={required}  skipped={list(session.skipped)}")
+#Provide or Make Button by takiing required modes and data
+def buttonStatus(pc_data: str, hc_data: str, cb_data: str) -> list:
+    button = [
+        [
+            InlineKeyboardButton(f'Pʀᴏᴛᴇᴄᴛ Cᴏɴᴛᴇɴᴛ: {pc_data}', callback_data='pc'),
+            InlineKeyboardButton(f'Hɪᴅᴇ Cᴀᴘᴛɪᴏɴ: {hc_data}', callback_data='hc')
+        ],
+        [
+            InlineKeyboardButton(f'Cʜᴀɴɴᴇʟ Bᴜᴛᴛᴏɴ: {cb_data}', callback_data='cb'), 
+            InlineKeyboardButton(f'◈ Sᴇᴛ Bᴜᴛᴛᴏɴ ➪', callback_data='setcb')
+        ],
+        [
+            InlineKeyboardButton('🔄 Rᴇғʀᴇsʜ', callback_data='files_cmd'), 
+            InlineKeyboardButton('Cʟᴏsᴇ ✖️', callback_data='close')
+        ],
+    ]
+    return button
 
-        skipped_names  = [QUALITY_DISPLAY[k] for k in session.skipped] if session.skipped else ["Koi nahi (sab include)"]
-        required_names = [QUALITY_DISPLAY[k] for k in required]
-
-        text = (
-            "<b>✅ Confirmed!</b>\n\n"
-            f"<b>⏭ Skipped:</b> {', '.join(skipped_names)}\n"
-            f"<b>📥 Required:</b> {', '.join(required_names)}\n\n"
-            f"<i>Ab {len(required)} file{'s' if len(required) > 1 else ''} bhejo.</i>"
-        )
-        await query.edit_message_text(text, reply_markup=None)
-        await query.answer("Session ready! Files bhejo ab. 📂")
-
-        msg = f"[SQuality] Confirmed  user={user_id}  required={required}  skipped={list(session.skipped)}"
-        logger.info(msg); print(msg)
-    
+#Verify user, if he/she is admin or owner before processing the query...
+async def authoUser(query, id, owner_only=False):
+    if not owner_only:
+        if not any([id == OWNER_ID, await kingdb.admin_exist(id)]):
+            await query.answer("❌ Yᴏᴜ ᴀʀᴇ ɴᴏᴛ Aᴅᴍɪɴ !", show_alert=True)
+            return False
+        return True
     else:
-        print(f"[SQuality] UNKNOWN callback data={data}  user={user_id}")
+        if id != OWNER_ID:
+            await query.answer("❌ Yᴏᴜ ᴀʀᴇ ɴᴏᴛ Oᴡɴᴇʀ !", show_alert=True)
+            return False
+        return True
 
-
-@Bot.on_message(filters.command("cancel") & filters.private & is_admin, group=-2)
-async def squality_cancel(client: Bot, message: Message):
-    user_id = message.from_user.id
-    if user_id in squality_sessions:
-        _sq_clear(user_id)
-        print(f"[SQuality] Cancelled  user={user_id}")
-        await message.reply("<b>✅ SQuality task cancel ho gaya.</b>", quote=True)
-        message.stop_propagation()
-
-
-@Bot.on_message(
-    ~filters.command(_CMD_LIST) & filters.private & is_admin,
-    group=-2,
-)
-async def squality_file_handler(client: Bot, message: Message):
-    user_id = message.from_user.id
-    print(f"[SQuality] HANDLER ENTRY  user={user_id}  session_active={user_id in squality_sessions}")
-
-    if user_id not in squality_sessions:
-        return
-
-    session = squality_sessions[user_id]
-
-    if not session.confirmed:
-        await message.reply(
-            "⚠️ Pehle quality selection <b>Confirm</b> karo.\n"
-            "<i>(Upar diye buttons mein se toggle karo fir Confirm dabao.)</i>",
-            quote=True,
-        )
-        message.stop_propagation()
-        return
-
-    try:
-        await _sq_process(client, message, user_id, session)
-    except Exception as exc:
-        tb = traceback.format_exc()
-        logger.error(f"[SQuality] handler error  user={user_id}: {exc}")
-        print(f"[SQuality] handler error  user={user_id}: {exc}\n{tb}")
+@Bot.on_callback_query(group=1)
+async def cb_handler(client: Bot, query: CallbackQuery):
+    data = query.data        
+    if data == "close":
+        await query.message.delete()
         try:
-            await message.reply(f"<b>❌ Eʀʀᴏʀ:</b>\n<code>{exc}</code>", quote=True)
-        except Exception:
+            await query.message.reply_to_message.delete()
+        except:
             pass
+            
+    elif data == "about":
+        user = await client.get_users(OWNER_ID)
+        user_link = f"https://t.me/{user.username}" if user.username else f"tg://openmessage?user_id={OWNER_ID}" 
+        ownername = f"<a href={user_link}>{user.first_name}</a>" if user.first_name else f"<a href={user_link}>no name !</a>"
+        await query.edit_message_media(
+            InputMediaPhoto("https://envs.sh/Ckc.jpg", 
+                            ABOUT_TXT.format(
+                                botname = client.name,
+                                ownername = ownername, 
+                            )
+            ),
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('⬅️ Bᴀᴄᴋ', callback_data='start'), InlineKeyboardButton('Cʟᴏsᴇ ✖️', callback_data='close')]
+            ]),
+        )
+        
+    elif data == "CMD_TXT":
+        if await authoUser(query, query.from_user.id):
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+        
+        try:
+            await query.edit_message_media(
+                InputMediaPhoto(
+                    random.choice(PICS),
+                    CMD_TXT  # FORMATS.py se aa raha hai
+                ),
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton('Stutes', callback_data='setting'),
+                        InlineKeyboardButton('Cʟᴏsᴇ ✖️', callback_data='close')
+                    ]
+                ])
+            )
+        except Exception as e:
+            print(f"! Error Occured on callback data = 'CMD_TXT' : {e}")
+            
+        
+    elif data == "setting":
+        await query.edit_message_media(InputMediaPhoto(random.choice(PICS), "<b>Pʟᴇᴀsᴇ wᴀɪᴛ !\n\n<i>🔄 Rᴇᴛʀɪᴇᴠɪɴɢ ᴀʟʟ Sᴇᴛᴛɪɴɢs...</i></b>"))
+        try:
+            total_fsub = len(await kingdb.get_all_channels())
+            total_admin = len(await kingdb.get_all_admins())
+            total_ban = len(await kingdb.get_ban_users())
+            autodel_mode = 'Eɴᴀʙʟᴇᴅ' if await kingdb.get_auto_delete() else 'Dɪsᴀʙʟᴇᴅ'
+            protect_content = 'Eɴᴀʙʟᴇᴅ' if await kingdb.get_protect_content() else 'Dɪsᴀʙʟᴇᴅ'
+            hide_caption = 'Eɴᴀʙʟᴇᴅ' if await kingdb.get_hide_caption() else 'Dɪsᴀʙʟᴇᴅ'
+            chnl_butn = 'Eɴᴀʙʟᴇᴅ' if await kingdb.get_channel_button() else 'Dɪsᴀʙʟᴇᴅ'
+            reqfsub = 'Eɴᴀʙʟᴇᴅ' if await kingdb.get_request_forcesub() else 'Dɪsᴀʙʟᴇᴅ'
+            
+            await query.edit_message_media(
+                InputMediaPhoto(random.choice(PICS),
+                                SETTING_TXT.format(
+                                    total_fsub = total_fsub,
+                                    total_admin = total_admin,
+                                    total_ban = total_ban,
+                                    autodel_mode = autodel_mode,
+                                    protect_content = protect_content,
+                                    hide_caption = hide_caption,
+                                    chnl_butn = chnl_butn,
+                                    reqfsub = reqfsub
+                                )
+                ),
+                reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('⬅️ Bᴀᴄᴋ', callback_data='CMD_TXT'), InlineKeyboardButton('Cʟᴏsᴇ ✖️', callback_data='close')]
+                ]),
+            )
+        except Exception as e:
+            print(f"! Error Occured on callback data = 'setting' : {e}")
+        
+    elif data == "start":
+        await query.edit_message_media(
+            InputMediaPhoto(random.choice(PICS), 
+                            START_MSG.format(
+                                first = query.from_user.first_name,
+                                last = query.from_user.last_name,
+                                username = None if not query.from_user.username else '@' + query.from_user.username,
+                                mention = query.from_user.mention,
+                                id = query.from_user.id
+                            )
+            ),
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton('🤖 Aʙᴏᴜᴛ ᴍᴇ', callback_data='about'), InlineKeyboardButton('Sᴇᴛᴛɪɴɢs ⚙️', callback_data='setting')]
+            ]),
+        )
+        
+    elif data == "files_cmd":
+        if await authoUser(query, query.from_user.id) : 
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....") 
+                
+            try:
+                protect_content, pcd = await fileSettings(kingdb.get_protect_content)
+                hide_caption, hcd = await fileSettings(kingdb.get_hide_caption)
+                channel_button, cbd = await fileSettings(kingdb.get_channel_button)
+                name, link = await kingdb.get_channel_button_link()
+                
+                await query.edit_message_media(
+                    InputMediaPhoto(files_cmd_pic,
+                                    FILES_CMD_TXT.format(
+                                        protect_content = protect_content,
+                                        hide_caption = hide_caption,
+                                        channel_button = channel_button,
+                                        name = name,
+                                        link = link
+                                    )
+                    ),
+                    reply_markup = InlineKeyboardMarkup(buttonStatus(pcd, hcd, cbd)),
+                )                   
+            except Exception as e:
+                print(f"! Error Occured on callback data = 'files_cmd' : {e}")
+            
+    elif data == "pc":
+        if await authoUser(query, query.from_user.id) :
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....") 
+                
+            try:
+                pic, protect_content, pcd = await fileSettings(kingdb.get_protect_content, kingdb.set_protect_content)
+                hide_caption, hcd = await fileSettings(kingdb.get_hide_caption)   
+                channel_button, cbd = await fileSettings(kingdb.get_channel_button) 
+                name, link = await kingdb.get_channel_button_link()
+                
+                await query.edit_message_media(
+                    InputMediaPhoto(pic,
+                                    FILES_CMD_TXT.format(
+                                        protect_content = protect_content,
+                                        hide_caption = hide_caption,
+                                        channel_button = channel_button,
+                                        name = name,
+                                        link = link
+                                    )
+                    ),
+                    reply_markup = InlineKeyboardMarkup(buttonStatus(pcd, hcd, cbd))
+                )                   
+            except Exception as e:
+                print(f"! Error Occured on callback data = 'pc' : {e}")
+                
+    elif data == "hc":
+        if await authoUser(query, query.from_user.id) :
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....") 
+                
+            try:
+                protect_content, pcd = await fileSettings(kingdb.get_protect_content)
+                pic, hide_caption, hcd = await fileSettings(kingdb.get_hide_caption, kingdb.set_hide_caption)   
+                channel_button, cbd = await fileSettings(kingdb.get_channel_button) 
+                name, link = await kingdb.get_channel_button_link()
+                
+                await query.edit_message_media(
+                    InputMediaPhoto(pic,
+                                    FILES_CMD_TXT.format(
+                                        protect_content = protect_content,
+                                        hide_caption = hide_caption,
+                                        channel_button = channel_button,
+                                        name = name,
+                                        link = link
+                                    )
+                    ),
+                    reply_markup = InlineKeyboardMarkup(buttonStatus(pcd, hcd, cbd))
+                )                   
+            except Exception as e:
+                print(f"! Error Occured on callback data = 'hc' : {e}")
+            
+    elif data == "cb":
+        if await authoUser(query, query.from_user.id) :
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....") 
+                
+            try:
+                protect_content, pcd = await fileSettings(kingdb.get_protect_content)
+                hide_caption, hcd = await fileSettings(kingdb.get_hide_caption)   
+                pic, channel_button, cbd = await fileSettings(kingdb.get_channel_button, kingdb.set_channel_button) 
+                name, link = await kingdb.get_channel_button_link()
+                
+                await query.edit_message_media(
+                    InputMediaPhoto(pic,
+                                    FILES_CMD_TXT.format(
+                                        protect_content = protect_content,
+                                        hide_caption = hide_caption,
+                                        channel_button = channel_button,
+                                        name = name,
+                                        link = link
+                                    )
+                    ),
+                    reply_markup = InlineKeyboardMarkup(buttonStatus(pcd, hcd, cbd))
+                )                   
+            except Exception as e:
+                print(f"! Error Occured on callback data = 'cb' : {e}")
+            
+    elif data == "setcb":
+        id = query.from_user.id
+        if await authoUser(query, id) :
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....") 
+                
+            try:
+                button_name, button_link = await kingdb.get_channel_button_link()
+            
+                button_preview = [[InlineKeyboardButton(text=button_name, url=button_link)]]  
+                set_msg = await client.ask(chat_id = id, text=f'<b>Tᴏ ᴄʜᴀɴɢᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴ, Pʟᴇᴀsᴇ sᴇɴᴅ ᴠᴀʟɪᴅ ᴀʀɢᴜᴍᴇɴᴛs ᴡɪᴛʜɪɴ 1 ᴍɪɴᴜᴛᴇ.\nFᴏʀ ᴇxᴀᴍᴘʟᴇ:\n<blockquote><code>Join Channel - https://t.me/btth480p</code></blockquote>\n\n<i>Bᴇʟᴏᴡ ɪs ʙᴜᴛᴛᴏɴ Pʀᴇᴠɪᴇᴡ ⬇️</i></b>', timeout=60, reply_markup=InlineKeyboardMarkup(button_preview), disable_web_page_preview = True)
+                button = set_msg.text.split(' - ')
+                
+                if len(button) != 2:
+                    markup = [[InlineKeyboardButton(f'◈ Sᴇᴛ Cʜᴀɴɴᴇʟ Bᴜᴛᴛᴏɴ ➪', callback_data='setcb')]]
+                    return await set_msg.reply("<b>Pʟᴇᴀsᴇ sᴇɴᴅ ᴠᴀʟɪᴅ ᴀʀɢᴜᴍᴇɴᴛs.\nFᴏʀ ᴇxᴀᴍᴘʟᴇ:\n<blockquote><code>Join Channel - https://t.me/btth480p</code></blockquote>\n\n<i>Tʀʏ ᴀɢᴀɪɴ ʙʏ ᴄʟɪᴄᴋɪɴɢ ʙᴇʟᴏᴡ ʙᴜᴛᴛᴏɴ..</i></b>", reply_markup=InlineKeyboardMarkup(markup), disable_web_page_preview = True)
+                
+                button_name = button[0].strip(); button_link = button[1].strip()
+                button_preview = [[InlineKeyboardButton(text=button_name, url=button_link)]]
+                
+                await set_msg.reply("<b><i>Aᴅᴅᴇᴅ Sᴜᴄcᴇssғᴜʟʟʏ ✅</i>\n<blockquote>Sᴇᴇ ʙᴇʟᴏᴡ ʙᴜᴛᴛᴏɴ ᴀs Pʀᴇᴠɪᴇᴡ ⬇️</blockquote></b>", reply_markup=InlineKeyboardMarkup(button_preview))
+                await kingdb.set_channel_button_link(button_name, button_link)
+                return
+            except Exception as e:
+                try:
+                    await set_msg.reply(f"<b>! Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ..\n<blockquote>Rᴇᴀsᴏɴ:</b> {e}</blockquote>")
+                    print(f"! Error Occured on callback data = 'setcb' : {e}")
+                except:
+                    await client.send_message(id, text=f"<b>! Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ..\n<blockquote><i>Rᴇᴀsᴏɴ: 1 minute Time out ..</i></b></blockquote>", disable_notification=True)
+                    print(f"! Error Occured on callback data = 'setcb' -> Rᴇᴀsᴏɴ: 1 minute Time out ..")
 
-    print(f"[SQuality] stopping propagation  user={user_id}")
-    message.stop_propagation()
+    elif data == 'autodel_cmd':
+        if await authoUser(query, query.from_user.id, owner_only=True) :
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....") 
+                
+            try:
+                timer = convert_time(await kingdb.get_del_timer())
+                autodel_mode, mode = await fileSettings(kingdb.get_auto_delete, delfunc=True)
+                
+                await query.edit_message_media(
+                    InputMediaPhoto(autodel_cmd_pic,
+                                    AUTODEL_CMD_TXT.format(
+                                        autodel_mode = autodel_mode,
+                                        timer = timer
+                                    )
+                    ),
+                    reply_markup = InlineKeyboardMarkup([
+                        [InlineKeyboardButton(mode, callback_data='chng_autodel'), InlineKeyboardButton('◈ Sᴇᴛ Tɪᴍᴇʀ ⏱', callback_data='set_timer')],
+                        [InlineKeyboardButton('🔄 Rᴇғʀᴇsʜ', callback_data='autodel_cmd'), InlineKeyboardButton('Cʟᴏsᴇ ✖️', callback_data='close')]
+                    ])
+                )
+            except Exception as e:
+                print(f"! Error Occured on callback data = 'autodel_cmd' : {e}")
+            
+    elif data == 'chng_autodel':
+        if await authoUser(query, query.from_user.id, owner_only=True) :
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+                
+            try:
+                timer = convert_time(await kingdb.get_del_timer())
+                pic, autodel_mode, mode = await fileSettings(kingdb.get_auto_delete, kingdb.set_auto_delete, delfunc=True)
+            
+                await query.edit_message_media(
+                    InputMediaPhoto(pic,
+                                    AUTODEL_CMD_TXT.format(
+                                        autodel_mode = autodel_mode,
+                                        timer = timer
+                                    )
+                    ),
+                    reply_markup = InlineKeyboardMarkup([
+                        [InlineKeyboardButton(mode, callback_data='chng_autodel'), InlineKeyboardButton('◈ Sᴇᴛ Tɪᴍᴇʀ ⏱', callback_data='set_timer')],
+                        [InlineKeyboardButton('🔄 Rᴇғʀᴇsʜ', callback_data='autodel_cmd'), InlineKeyboardButton('Cʟᴏsᴇ ✖️', callback_data='close')]
+                    ])
+                )
+            except Exception as e:
+                print(f"! Error Occured on callback data = 'chng_autodel' : {e}")
+
+    elif data == 'set_timer':
+        id = query.from_user.id
+        if await authoUser(query, id, owner_only=True) :
+            try:
+                
+                timer = convert_time(await kingdb.get_del_timer())
+                set_msg = await client.ask(chat_id=id, text=f'<b><blockquote>⏱ Cᴜʀʀᴇɴᴛ Tɪᴍᴇʀ: {timer}</blockquote>\n\nTᴏ ᴄʜᴀɴɢᴇ ᴛɪᴍᴇʀ, Pʟᴇᴀsᴇ sᴇɴᴅ ᴠᴀʟɪᴅ ɴᴜᴍʙᴇʀ ɪɴ sᴇᴄᴏɴᴅs ᴡɪᴛʜɪɴ 1 ᴍɪɴᴜᴛᴇ.\n<blockquote>Fᴏʀ ᴇxᴀᴍᴘʟᴇ: <code>300</code>, <code>600</code>, <code>900</code></b></blockquote>', timeout=60)
+                del_timer = set_msg.text.split()
+                
+                if len(del_timer) == 1 and del_timer[0].isdigit():
+                    DEL_TIMER = int(del_timer[0])
+                    await kingdb.set_del_timer(DEL_TIMER)
+                    timer = convert_time(DEL_TIMER)
+                    await set_msg.reply(f"<b><i>Aᴅᴅᴇᴅ Sᴜᴄcᴇssғᴜʟʟʏ ✅</i>\n<blockquote>⏱ Cᴜʀʀᴇɴᴛ Tɪᴍᴇʀ: {timer}</blockquote></b>")
+                else:
+                    markup = [[InlineKeyboardButton('◈ Sᴇᴛ Dᴇʟᴇᴛᴇ Tɪᴍᴇʀ ⏱', callback_data='set_timer')]]
+                    return await set_msg.reply("<b>Pʟᴇᴀsᴇ sᴇɴᴅ ᴠᴀʟɪᴅ ɴᴜᴍʙᴇʀ ɪɴ sᴇᴄᴏɴᴅs.\n<blockquote>Fᴏʀ ᴇxᴀᴍᴘʟᴇ: <code>300</code>, <code>600</code>, <code>900</code></blockquote>\n\n<i>Tʀʏ ᴀɢᴀɪɴ ʙʏ ᴄʟɪᴄᴋɪɴɢ ʙᴇʟᴏᴡ ʙᴜᴛᴛᴏɴ..</i></b>", reply_markup=InlineKeyboardMarkup(markup))
+    
+            except Exception as e:
+                try:
+                    await set_msg.reply(f"<b>! Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ..\n<blockquote>Rᴇᴀsᴏɴ:</b> {e}</blockquote>")
+                    print(f"! Error Occured on callback data = 'set_timer' : {e}")
+                except:
+                    await client.send_message(id, text=f"<b>! Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ..\n<blockquote><i>Rᴇᴀsᴏɴ: 1 minute Time out ..</i></b></blockquote>", disable_notification=True)
+                    print(f"! Error Occured on callback data = 'set_timer' -> Rᴇᴀsᴏɴ: 1 minute Time out ..")
+
+    elif data == 'chng_req':
+        if await authoUser(query, query.from_user.id, owner_only=True) :
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+        
+            try:
+                on = off = ""
+                if await kingdb.get_request_forcesub():
+                    await kingdb.set_request_forcesub(False)
+                    off = "🔴"
+                    texting = off_txt
+                else:
+                    await kingdb.set_request_forcesub(True)
+                    on = "🟢"
+                    texting = on_txt
+        
+                button = [
+                    [InlineKeyboardButton(f"{on} ON", "chng_req"), InlineKeyboardButton(f"{off} OFF", "chng_req")],
+                    [InlineKeyboardButton("⚙️ Mᴏʀᴇ Sᴇᴛᴛɪɴɢs ⚙️", "more_settings")]
+                ]
+                await query.message.edit_text(text=RFSUB_CMD_TXT.format(req_mode=texting), reply_markup=InlineKeyboardMarkup(button)) #🎉)
+        
+            except Exception as e:
+                print(f"! Error Occured on callback data = 'chng_req' : {e}")
+
+
+    elif data == 'more_settings':
+        if await authoUser(query, query.from_user.id, owner_only=True) :
+            #await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+            try:
+                await query.message.edit_text("<b>Pʟᴇᴀsᴇ wᴀɪᴛ !\n\n<i>🔄 Rᴇᴛʀɪᴇᴠɪɴɢ ᴀʟʟ Sᴇᴛᴛɪɴɢs...</i></b>")
+                LISTS = "Eᴍᴘᴛʏ Rᴇǫᴜᴇsᴛ FᴏʀᴄᴇSᴜʙ Cʜᴀɴɴᴇʟ Lɪsᴛ !?"
+                
+                REQFSUB_CHNLS = await kingdb.get_reqChannel()
+                if REQFSUB_CHNLS:
+                    LISTS = ""
+                    channel_name = "<i>Uɴᴀʙʟᴇ Lᴏᴀᴅ Nᴀᴍᴇ..</i>"
+                    for CHNL in REQFSUB_CHNLS:
+                        await query.message.reply_chat_action(ChatAction.TYPING)
+                        try:
+                            name = (await client.get_chat(CHNL)).title
+                        except:
+                            name = None
+                        channel_name = name if name else channel_name
+                        
+                        user = await kingdb.get_reqSent_user(CHNL)
+                        channel_users = len(user) if user else 0
+                        
+                        link = await kingdb.get_stored_reqLink(CHNL)
+                        if link:
+                            channel_name = f"<a href={link}>{channel_name}</a>"
+    
+                        LISTS += f"NAME: {channel_name}\n(ID: <code>{CHNL}</code>)\nUSERS: {channel_users}\n\n"
+                        
+                buttons = [
+                    [InlineKeyboardButton("ᴄʟᴇᴀʀ ᴜsᴇʀs", "clear_users"), InlineKeyboardButton("cʟᴇᴀʀ cʜᴀɴɴᴇʟs", "clear_chnls")],
+                    [InlineKeyboardButton("♻️  Rᴇғʀᴇsʜ Sᴛᴀᴛᴜs  ♻️", "more_settings")],
+                    [InlineKeyboardButton("⬅️ Bᴀᴄᴋ", "req_fsub"), InlineKeyboardButton("Cʟᴏsᴇ ✖️", "close")]
+                ]
+                await query.message.reply_chat_action(ChatAction.CANCEL)
+                await query.message.edit_text(text=RFSUB_MS_TXT.format(reqfsub_list=LISTS.strip()), reply_markup=InlineKeyboardMarkup(buttons))
+                        
+            except Exception as e:
+                print(f"! Error Occured on callback data = 'more_settings' : {e}")
+
+
+    elif data == 'clear_users':
+        #if await authoUser(query, query.from_user.id, owner_only=True) :
+        #await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")    
+        try:
+            REQFSUB_CHNLS = await kingdb.get_reqChannel()
+            if not REQFSUB_CHNLS:
+                return await query.answer("Eᴍᴘᴛʏ Rᴇǫᴜᴇsᴛ FᴏʀᴄᴇSᴜʙ Cʜᴀɴɴᴇʟ !?", show_alert=True)
+
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+                
+            REQFSUB_CHNLS = list(map(str, REQFSUB_CHNLS))    
+            buttons = [REQFSUB_CHNLS[i:i+2] for i in range(0, len(REQFSUB_CHNLS), 2)]
+            buttons.insert(0, ['CANCEL'])
+            buttons.append(['DELETE ALL CHANNELS USER'])
+
+            user_reply = await client.ask(query.from_user.id, text=CLEAR_USERS_TXT, reply_markup=ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True))
+            
+            if user_reply.text == 'CANCEL':
+                return await user_reply.reply("<b><i>🆑 Cᴀɴᴄᴇʟʟᴇᴅ...</i></b>", reply_markup=ReplyKeyboardRemove())
+                
+            elif user_reply.text in REQFSUB_CHNLS:
+                try:
+                    await kingdb.clear_reqSent_user(int(user_reply.text))
+                    return await user_reply.reply(f"<b><blockquote>✅ Usᴇʀ Dᴀᴛᴀ Sᴜᴄᴄᴇssғᴜʟʟʏ Cʟᴇᴀʀᴇᴅ ғʀᴏᴍ Cʜᴀɴɴᴇʟ ɪᴅ: <code>{user_reply.text}</code></blockquote></b>", reply_markup=ReplyKeyboardRemove())
+                except Exception as e:
+                    return await user_reply.reply(f"<b>! Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ...\n<blockquote>Rᴇᴀsᴏɴ:</b> {e}</blockquote>", reply_markup=ReplyKeyboardRemove())
+                    
+            elif user_reply.text == 'DELETE ALL CHANNELS USER':
+                try:
+                    for CHNL in REQFSUB_CHNLS:
+                        await kingdb.clear_reqSent_user(int(CHNL))
+                    return await user_reply.reply(f"<b><blockquote>✅ Usᴇʀ Dᴀᴛᴀ Sᴜᴄᴄᴇssғᴜʟʟʏ Cʟᴇᴀʀᴇᴅ ғʀᴏᴍ Aʟʟ Cʜᴀɴɴᴇʟ ɪᴅs</blockquote></b>", reply_markup=ReplyKeyboardRemove())
+                except Exception as e:
+                    return await user_reply.reply(f"<b>! Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ...\n<blockquote>Rᴇᴀsᴏɴ:</b> {e}</blockquote>", reply_markup=ReplyKeyboardRemove())
+                    
+            else:
+                return await user_reply.reply(f"<b><blockquote>INVALID SELECTIONS</blockquote></b>", reply_markup=ReplyKeyboardRemove())
+            
+        except Exception as e:
+            print(f"! Error Occured on callback data = 'clear_users' : {e}")
+
+
+    elif data == 'clear_chnls':
+        #if await authoUser(query, query.from_user.id, owner_only=True) 
+            
+        try:
+            REQFSUB_CHNLS = await kingdb.get_reqChannel()
+            if not REQFSUB_CHNLS:
+                return await query.answer("Eᴍᴘᴛʏ Rᴇǫᴜᴇsᴛ FᴏʀᴄᴇSᴜʙ Cʜᴀɴɴᴇʟ !?", show_alert=True)
+            
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+                
+            REQFSUB_CHNLS = list(map(str, REQFSUB_CHNLS))    
+            buttons = [REQFSUB_CHNLS[i:i+2] for i in range(0, len(REQFSUB_CHNLS), 2)]
+            buttons.insert(0, ['CANCEL'])
+            buttons.append(['DELETE ALL CHANNEL IDS'])
+
+            user_reply = await client.ask(query.from_user.id, text=CLEAR_CHNLS_TXT, reply_markup=ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True))
+            
+            if user_reply.text == 'CANCEL':
+                return await user_reply.reply("<b><i>🆑 Cᴀɴᴄᴇʟʟᴇᴅ...</i></b>", reply_markup=ReplyKeyboardRemove())
+                
+            elif user_reply.text in REQFSUB_CHNLS:
+                try:
+                    chnl_id = int(user_reply.text)
+
+                    await kingdb.del_reqChannel(chnl_id)
+
+                    try: await client.revoke_chat_invite_link(chnl_id, await kingdb.get_stored_reqLink(chnl_id))
+                    except: pass
+
+                    await kingdb.del_stored_reqLink(chnl_id)
+
+                    return await user_reply.reply(f"<b><blockquote><code>{user_reply.text}</code> Cʜᴀɴɴᴇʟ ɪᴅ ᴀʟᴏɴɢ ᴡɪᴛʜ ɪᴛs ᴅᴀᴛᴀ sᴜᴄᴄᴇssғᴜʟʟʏ Dᴇʟᴇᴛᴇᴅ ✅</blockquote></b>", reply_markup=ReplyKeyboardRemove())
+                except Exception as e:
+                    return await user_reply.reply(f"<b>! Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ...\n<blockquote>Rᴇᴀsᴏɴ:</b> {e}</blockquote>", reply_markup=ReplyKeyboardRemove())
+                    
+            elif user_reply.text == 'DELETE ALL CHANNEL IDS':
+                try:
+                    for CHNL in REQFSUB_CHNLS:
+                        chnl = int(CHNL)
+
+                        await kingdb.del_reqChannel(chnl)
+
+                        try: await client.revoke_chat_invite_link(chnl, await kingdb.get_stored_reqLink(chnl))
+                        except: pass
+
+                        await kingdb.del_stored_reqLink(chnl)
+
+                    return await user_reply.reply(f"<b><blockquote>Aʟʟ Cʜᴀɴɴᴇʟ ɪᴅs ᴀʟᴏɴɢ ᴡɪᴛʜ ɪᴛs ᴅᴀᴛᴀ sᴜᴄᴄᴇssғᴜʟʟʏ Dᴇʟᴇᴛᴇᴅ ✅</blockquote></b>", reply_markup=ReplyKeyboardRemove())
+                
+                except Exception as e:
+                    return await user_reply.reply(f"<b>! Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ...\n<blockquote>Rᴇᴀsᴏɴ:</b> {e}</blockquote>", reply_markup=ReplyKeyboardRemove())
+                    
+            else:
+                return await user_reply.reply(f"<b><blockquote>INVALID SELECTIONS</blockquote></b>", reply_markup=ReplyKeyboardRemove())
+        
+        except Exception as e:
+            print(f"! Error Occured on callback data = 'more_settings' : {e}")
+
+
+
+    elif data == 'clear_links':
+        #if await authoUser(query, query.from_user.id, owner_only=True) :
+        #await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+            
+        try:
+            REQFSUB_CHNLS = await kingdb.get_reqLink_channels()
+            if not REQFSUB_CHNLS:
+                return await query.answer("Nᴏ Sᴛᴏʀᴇᴅ Rᴇǫᴜᴇsᴛ Lɪɴᴋ Aᴠᴀɪʟᴀʙʟᴇ !?", show_alert=True)
+
+            await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+                
+            REQFSUB_CHNLS = list(map(str, REQFSUB_CHNLS))    
+            buttons = [REQFSUB_CHNLS[i:i+2] for i in range(0, len(REQFSUB_CHNLS), 2)]
+            buttons.insert(0, ['CANCEL'])
+            buttons.append(['DELETE ALL REQUEST LINKS'])
+
+            user_reply = await client.ask(query.from_user.id, text=CLEAR_LINKS_TXT, reply_markup=ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True))
+            
+            if user_reply.text == 'CANCEL':
+                return await user_reply.reply("<b><i>🆑 Cᴀɴᴄᴇʟʟᴇᴅ...</i></b>", reply_markup=ReplyKeyboardRemove())
+                
+            elif user_reply.text in REQFSUB_CHNLS:
+                channel_id = int(user_reply.text)
+                try:
+                    try:
+                        await client.revoke_chat_invite_link(channel_id, await kingdb.get_stored_reqLink(channel_id))
+                    except:
+                        text = """<b>❌ Uɴᴀʙʟᴇ ᴛᴏ Rᴇᴠᴏᴋᴇ ʟɪɴᴋ !
+<blockquote expandable>ɪᴅ: <code>{}</code></b>
+<i>Eɪᴛʜᴇʀ ᴛʜᴇ ʙᴏᴛ ɪs ɴᴏᴛ ɪɴ ᴀʙᴏᴠᴇ ᴄʜᴀɴɴᴇʟ Oʀ ᴅᴏɴ'ᴛ ʜᴀᴠᴇ ᴘʀᴏᴘᴇʀ ᴀᴅᴍɪɴ ᴘᴇʀᴍɪssɪᴏɴs</i></blockquote>"""
+                        return await user_reply.reply(text=text.format(channel_id), reply_markup=ReplyKeyboardRemove())
+                        
+                    await kingdb.del_stored_reqLink(channel_id)
+                    return await user_reply.reply(f"<b><blockquote><code>{channel_id}</code> Cʜᴀɴɴᴇʟs Lɪɴᴋ Sᴜᴄᴄᴇssғᴜʟʟʏ Dᴇʟᴇᴛᴇᴅ ✅</blockquote></b>", reply_markup=ReplyKeyboardRemove())
+                
+                except Exception as e:
+                    return await user_reply.reply(f"<b>! Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ...\n<blockquote>Rᴇᴀsᴏɴ:</b> {e}</blockquote>", reply_markup=ReplyKeyboardRemove())
+                    
+            elif user_reply.text == 'DELETE ALL REQUEST LINKS':
+                try:
+                    result = ""
+                    for CHNL in REQFSUB_CHNLS:
+                        channel_id = int(CHNL)
+                        try:
+                            await client.revoke_chat_invite_link(channel_id, await kingdb.get_stored_reqLink(channel_id))
+                        except:
+                            result += f"<blockquote expandable><b><code>{channel_id}</code> Uɴᴀʙʟᴇ ᴛᴏ Rᴇᴠᴏᴋᴇ ❌</b>\n<i>Eɪᴛʜᴇʀ ᴛʜᴇ ʙᴏᴛ ɪs ɴᴏᴛ ɪɴ ᴀʙᴏᴠᴇ ᴄʜᴀɴɴᴇʟ Oʀ ᴅᴏɴ'ᴛ ʜᴀᴠᴇ ᴘʀᴏᴘᴇʀ ᴀᴅᴍɪɴ ᴘᴇʀᴍɪssɪᴏɴs.</i></blockquote>\n"
+                            continue
+                        await kingdb.del_stored_reqLink(channel_id)
+                        result += f"<blockquote><b><code>{channel_id}</code> IDs Lɪɴᴋ Dᴇʟᴇᴛᴇᴅ ✅</b></blockquote>\n"
+                        
+                    return await user_reply.reply(f"<b>⁉️ Oᴘᴇʀᴀᴛɪᴏɴ Rᴇsᴜʟᴛ:</b>\n{result.strip()}", reply_markup=ReplyKeyboardRemove())
+ 
+                except Exception as e:
+                    return await user_reply.reply(f"<b>! Eʀʀᴏʀ Oᴄᴄᴜʀᴇᴅ...\n<blockquote>Rᴇᴀsᴏɴ:</b> {e}</blockquote>", reply_markup=ReplyKeyboardRemove())
+                    
+            else:
+                return await user_reply.reply(f"<b><blockquote>INVALID SELECTIONS</blockquote></b>", reply_markup=ReplyKeyboardRemove())
+            
+        except Exception as e:
+            print(f"! Error Occured on callback data = 'more_settings' : {e}")
+            
+
+    elif data == 'req_fsub':
+        #if await authoUser(query, query.from_user.id, owner_only=True) :
+        await query.answer("♻️ Qᴜᴇʀʏ Pʀᴏᴄᴇssɪɴɢ....")
+    
+        try:
+            on = off = ""
+            if await kingdb.get_request_forcesub():
+                on = "🟢"
+                texting = on_txt
+            else:
+                off = "🔴"
+                texting = off_txt
+    
+            button = [
+                [InlineKeyboardButton(f"{on} ON", "chng_req"), InlineKeyboardButton(f"{off} OFF", "chng_req")],
+                [InlineKeyboardButton("⚙️ Mᴏʀᴇ Sᴇᴛᴛɪɴɢs ⚙️", "more_settings")]
+            ]
+            await query.message.edit_text(text=RFSUB_CMD_TXT.format(req_mode=texting), reply_markup=InlineKeyboardMarkup(button)) #🎉)
+    
+        except Exception as e:
+            print(f"! Error Occured on callback data = 'chng_req' : {e}")
+        
+            
+                
+                    
+                 
