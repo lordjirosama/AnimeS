@@ -217,10 +217,8 @@ async def _q_finish(
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
             "<code>"
-            f"480p - {links['480p']}\n"
-            f"720p - {links['720p']}\n"
-            f"1080p - {links['1080p']}\n"
-            f"HDRip - {links['hdrip']}"
+            f"480p - {links['480p']} && 720p - {links['720p']}\n"
+            f"1080p - {links['1080p']} && HDRip - {links['hdrip']}"
             "</code>\n\n"
             "<i>💡 Tap to copy all links</i>"
         )
