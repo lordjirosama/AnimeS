@@ -226,7 +226,7 @@ async def _q_finish(
         await status.edit(final, disable_web_page_preview=True)
 
         # ── Sticker → DB channel ──
-        STICKER_ID = "CAACAgUAAxkBAAEELMRqFHQd_GFomO5tmlJdan4SB4fnTQACex8AAoWToVQB_gogIzHwxjsE"
+        STICKER_ID = "CAACAgUAAxkBAAEEXwtqIa-Jx7bGFBePEgd6b33KgQx0ugAChxwAAhmRCVWJiF1D-DjjgjsE"
         try:
             await client.send_sticker(chat_id=client.db_channel.id, sticker=STICKER_ID)
             print(f"[Quality] Sticker sent to DB channel  user={user_id}")
@@ -438,7 +438,7 @@ async def _sq_finish(
         await status.edit(final, disable_web_page_preview=True)
 
         # ── Sticker → DB channel ──
-        STICKER_ID = "CAACAgUAAxkBAAEELMRqFHQd_GFomO5tmlJdan4SB4fnTQACex8AAoWToVQB_gogIzHwxjsE"
+        STICKER_ID = "CAACAgUAAxkBAAEEXwtqIa-Jx7bGFBePEgd6b33KgQx0ugAChxwAAhmRCVWJiF1D-DjjgjsE"
         try:
             await client.send_sticker(chat_id=client.db_channel.id, sticker=STICKER_ID)
             print(f"[SQuality] Sticker sent to DB channel  user={user_id}")
