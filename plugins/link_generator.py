@@ -13,22 +13,33 @@ async def batch(client: Client, message: Message):
         # First message loop
         while True:
             try:
-                first_message = await client.ask(
-                    text=f"<b><blockquote>Fᴏʀᴡᴀʀᴅ ᴛʜᴇ Fɪʀsᴛ Mᴇssᴀɢᴇ ғʀᴏᴍ {channel} (ᴡɪᴛʜ ǫᴜᴏᴛᴇs)..</blockquote>\n<blockquote>Oʀ Sᴇɴᴅ ᴛʜᴇ {channel} Pᴏsᴛ Lɪɴᴋ</blockquote>\n\n<blockquote>❌ /cancel ᴛᴏ ᴀʙᴏʀᴛ</blockquote></b>",
+                ask_text = f"<b><blockquote>Fᴏʀᴡᴀʀᴅ ᴛʜᴇ Fɪʀsᴛ Mᴇssᴀɢᴇ ғʀᴏᴍ {channel} (ᴡɪᴛʜ ǫᴜᴏᴛᴇs)..</blockquote>\n<blockquote>Oʀ Sᴇɴᴅ ᴛʜᴇ {channel} Pᴏsᴛ Lɪɴᴋ</blockquote>\n\n<blockquote>❌ /cancel ᴛᴏ ᴀʙᴏʀᴛ</blockquote></b>"
+                
+                # Send message and track its ID
+                ask_msg = await client.send_message(
                     chat_id=message.from_user.id,
+                    text=ask_text,
+                    disable_web_page_preview=True
+                )
+                bot_messages.append(ask_msg.id)
+                
+                # Wait for user response
+                first_message = await client.ask(
+                    chat_id=message.from_user.id,
+                    text=ask_text,
                     filters=(filters.forwarded | (filters.text & ~filters.forwarded)),
                     timeout=60,
                     disable_web_page_preview=True
                 )
             except Exception as e:
-                print(f"Error in first message ask: {e}")
+                print(f"Error in first message: {e}")
                 await delete_messages(client, message.from_user.id, bot_messages)
                 return
 
             # ✅ Cancel check
             if first_message.text and first_message.text.strip().lower() == "/cancel":
-                reply = await first_message.reply("<b>❌ ᴘʀᴏᴄᴇss ᴄᴀɴᴄᴇʟʟᴇᴅ.</b>")
-                bot_messages.append(reply.id)
+                cancel_msg = await first_message.reply("<b>❌ ᴘʀᴏᴄᴇss ᴄᴀɴᴄᴇʟʟᴇᴅ.</b>")
+                bot_messages.append(cancel_msg.id)
                 await delete_messages(client, message.from_user.id, bot_messages)
                 return
 
@@ -36,33 +47,42 @@ async def batch(client: Client, message: Message):
             if f_msg_id:
                 break
             else:
-                reply = await first_message.reply(
+                error_msg = await first_message.reply(
                     f"<b>❌ Eʀʀᴏʀ..\n<blockquote>Tʜɪs Fᴏʀᴡᴀʀᴅᴇᴅ ᴘᴏsᴛ ᴏʀ ᴍᴇssᴀɢᴇ ʟɪɴᴋ ɪs ɴᴏᴛ ғʀᴏᴍ ᴍʏ {channel}</blockquote></b>",
                     quote=True,
                     disable_web_page_preview=True
                 )
-                bot_messages.append(reply.id)
+                bot_messages.append(error_msg.id)
                 continue
 
         # Second message loop
         while True:
             try:
-                second_message = await client.ask(
-                    text=f"<b><blockquote>Fᴏʀᴡᴀʀᴅ ᴛʜᴇ Lᴀsᴛ Mᴇssᴀɢᴇ ғʀᴏᴍ {channel} (ᴡɪᴛʜ ǫᴜᴏᴛᴇs)..</blockquote>\n<blockquote>Oʀ Sᴇɴᴅ ᴛʜᴇ {channel} Pᴏsᴛ Lɪɴᴋ</blockquote>\n\n<blockquote>❌ /cancel ᴛᴏ ᴀʙᴏʀᴛ</blockquote></b>",
+                ask_text_2 = f"<b><blockquote>Fᴏʀᴡᴀʀᴅ ᴛʜᴇ Lᴀsᴛ Mᴇssᴀɢᴇ ғʀᴏᴍ {channel} (ᴡɪᴛʜ ǫᴜᴏᴛᴇs)..</blockquote>\n<blockquote>Oʀ Sᴇɴᴅ ᴛʜᴇ {channel} Pᴏsᴛ Lɪɴᴋ</blockquote>\n\n<blockquote>❌ /cancel ᴛᴏ ᴀʙᴏʀᴛ</blockquote></b>"
+                
+                ask_msg_2 = await client.send_message(
                     chat_id=message.from_user.id,
+                    text=ask_text_2,
+                    disable_web_page_preview=True
+                )
+                bot_messages.append(ask_msg_2.id)
+                
+                second_message = await client.ask(
+                    chat_id=message.from_user.id,
+                    text=ask_text_2,
                     filters=(filters.forwarded | (filters.text & ~filters.forwarded)),
                     timeout=60,
                     disable_web_page_preview=True
                 )
             except Exception as e:
-                print(f"Error in second message ask: {e}")
+                print(f"Error in second message: {e}")
                 await delete_messages(client, message.from_user.id, bot_messages)
                 return
 
             # ✅ Cancel check
             if second_message.text and second_message.text.strip().lower() == "/cancel":
-                reply = await second_message.reply("<b>❌ ᴘʀᴏᴄᴇss ᴄᴀɴᴄᴇʟʟᴇᴅ.</b>")
-                bot_messages.append(reply.id)
+                cancel_msg = await second_message.reply("<b>❌ ᴘʀᴏᴄᴇss ᴄᴀɴᴄᴇʟʟᴇᴅ.</b>")
+                bot_messages.append(cancel_msg.id)
                 await delete_messages(client, message.from_user.id, bot_messages)
                 return
 
@@ -70,12 +90,12 @@ async def batch(client: Client, message: Message):
             if s_msg_id:
                 break
             else:
-                reply = await second_message.reply(
+                error_msg = await second_message.reply(
                     f"<b>❌ Eʀʀᴏʀ..\n<blockquote>Tʜɪs Fᴏʀᴡᴀʀᴅᴇᴅ ᴘᴏsᴛ ᴏʀ ᴍᴇssᴀɢᴇ ʟɪɴᴋ ɪs ɴᴏᴛ ғʀᴏᴍ ᴍʏ {channel}</blockquote></b>",
                     quote=True,
                     disable_web_page_preview=True
                 )
-                bot_messages.append(reply.id)
+                bot_messages.append(error_msg.id)
                 continue
 
         # Generate link
@@ -105,22 +125,31 @@ async def link_generator(client: Client, message: Message):
     try:
         while True:
             try:
-                channel_message = await client.ask(
-                    text=f"<b><blockquote>Fᴏʀᴡᴀʀᴅ ᴛʜᴇ Mᴇssᴀɢᴇ ғʀᴏᴍ {channel} (ᴡɪᴛʜ ǫᴜᴏᴛᴇs)..</blockquote>\n<blockquote>Oʀ Sᴇɴᴅ ᴛʜᴇ {channel} Pᴏsᴛ Lɪɴᴋ</blockquote>\n\n<blockquote>❌ /cancel ᴛᴏ ᴀʙᴏʀᴛ</blockquote></b>",
+                ask_text = f"<b><blockquote>Fᴏʀᴡᴀʀᴅ ᴛʜᴇ Mᴇssᴀɢᴇ ғʀᴏᴍ {channel} (ᴡɪᴛʜ ǫᴜᴏᴛᴇs)..</blockquote>\n<blockquote>Oʀ Sᴇɴᴅ ᴛʜᴇ {channel} Pᴏsᴛ Lɪɴᴋ</blockquote>\n\n<blockquote>❌ /cancel ᴛᴏ ᴀʙᴏʀᴛ</blockquote></b>"
+                
+                ask_msg = await client.send_message(
                     chat_id=message.from_user.id,
+                    text=ask_text,
+                    disable_web_page_preview=True
+                )
+                bot_messages.append(ask_msg.id)
+                
+                channel_message = await client.ask(
+                    chat_id=message.from_user.id,
+                    text=ask_text,
                     filters=(filters.forwarded | (filters.text & ~filters.forwarded)),
                     timeout=60,
                     disable_web_page_preview=True
                 )
             except Exception as e:
-                print(f"Error in genlink ask: {e}")
+                print(f"Error in genlink: {e}")
                 await delete_messages(client, message.from_user.id, bot_messages)
                 return
             
             # ✅ Cancel check
             if channel_message.text and channel_message.text.strip().lower() == "/cancel":
-                reply = await channel_message.reply("<b>❌ ᴘʀᴏᴄᴇss ᴄᴀɴᴄᴇʟʟᴇᴅ.</b>")
-                bot_messages.append(reply.id)
+                cancel_msg = await channel_message.reply("<b>❌ ᴘʀᴏᴄᴇss ᴄᴀɴᴄᴇʟʟᴇᴅ.</b>")
+                bot_messages.append(cancel_msg.id)
                 await delete_messages(client, message.from_user.id, bot_messages)
                 return
             
@@ -128,12 +157,12 @@ async def link_generator(client: Client, message: Message):
             if msg_id:
                 break
             else:
-                reply = await channel_message.reply(
+                error_msg = await channel_message.reply(
                     f"<b>❌ Eʀʀᴏʀ..\n<blockquote>Tʜɪs Fᴏʀᴡᴀʀᴅᴇᴅ ᴘᴏsᴛ ᴏʀ ᴍᴇssᴀɢᴇ ʟɪɴᴋ ɪs ɴᴏᴛ ғʀᴏᴍ ᴍʏ {channel}</blockquote></b>",
                     quote=True,
                     disable_web_page_preview=True
                 )
-                bot_messages.append(reply.id)
+                bot_messages.append(error_msg.id)
                 continue
 
         # Generate link
@@ -162,4 +191,3 @@ async def delete_messages(client: Client, user_id: int, message_ids: list):
         except Exception as e:
             print(f"Error deleting message {msg_id}: {e}")
             continue
-        
