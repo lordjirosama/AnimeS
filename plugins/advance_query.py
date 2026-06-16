@@ -618,4 +618,26 @@ async def cb_handler(client: Bot, query: CallbackQuery):
             
                 
                     
-                 
+    elif data == 'flink:status':
+        user_id = query.from_user.id
+
+        try:
+            await query.message.edit_text("<b><i>ʀᴇғʀᴇsʜɪɴɢ....</i></b>")
+            await flink.format_status_msg(query.message, user_id)
+        except Exception as e:
+                print(f"! Exception Occured on callback-data ({data}) : {e}")
+
+    
+    elif data == 'flink:change_format':
+        try:
+            await flink.change_flink_format(client, query)
+        except Exception as e:
+            print(f"! Exception Occured on callback-data ({data}) : {e}")
+
+    
+    elif data == 'flink:start':
+        try:
+            await flink.start_flink_process(client, query)
+        except Exception as e:
+            print(f"! Exception Occured on callback-data ({data}) : {e}")
+                             
