@@ -1,3 +1,4 @@
+# +++ Made By Obito [@i_killed_my_clan] +++
 import random
 from bot import Bot
 from plugins.FORMATS import *
@@ -6,7 +7,7 @@ from pyrogram.enums import ChatAction
 from plugins.autoDelete import convert_time
 from database.database import kingdb
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, InputMediaPhoto, ReplyKeyboardMarkup, ReplyKeyboardRemove    
-
+from plugins import flink
 
 #File setting function for retriveing modes and state of file related setting
 async def fileSettings(getfunc, setfunc=None, delfunc=False) :
