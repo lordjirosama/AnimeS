@@ -44,7 +44,8 @@ TG_BOT_WORKERS = int(os.environ.get("TG_BOT_WORKERS", ""))
 PICS = (os.environ.get("PICS", "https://ibb.co/sJqz5KZW")).split() #Required
 VIDEOS = (os.environ.get("VIDEOS", "")).split()
 #set your Custom Caption here, Keep None for Disable Custom Caption
-CUSTOM_CAPTION = os.environ.get("CUSTOM_CAPTION", "<b><blockquote expandable>{filename}</blockquote></b>")
+CUSTOM_CAPTION = os.environ.get("CUSTOM_CAPTION", "")
+#<b><blockquote expandable>{filename}</blockquote></b>")
 
 LOG_FILE_NAME = "filesharingbot.txt"
 
