@@ -31,7 +31,10 @@ EXAMPLES = """Exᴀᴍᴘʟᴇs:
 1080P = 1, HDRIP = 1, 4K = 1</code>  
 
 <code>480P = 2, 720P = 2, 1080P = 2 
-HDRIP = 1, 4K = 1</code></blockquote>"""
+HDRIP = 1, 4K = 1</code>
+
+<code>𝟰𝟴𝟬𝗽 = 2, 𝟳𝟮𝟬𝗽 = 2
+𝟭𝟬𝟴𝟬𝗽 = 2, 𝗛𝗗𝗿𝗶𝗽 = 2</code></blockquote>"""
 
 
 closeButton = InlineKeyboardMarkup([[InlineKeyboardButton("ᴄʟᴏsᴇ", callback_data = 'close')]])
