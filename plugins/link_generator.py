@@ -1,3 +1,4 @@
+# +++ Made By Obito [@i_killed_my_clan] +++
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from bot import Bot
@@ -89,7 +90,7 @@ async def batch(client: Client, message: Message):
         
         await client.send_message(
             chat_id=user_id,
-            text=f"<b>✅ Lɪɴᴋ Gᴇɴᴇʀᴀᴛᴇᴅ:</b>\n<blockquote>{link}</blockquote>",
+            text=f"<b>✅ Lɪɴᴋ Gᴇɴᴇʀᴀᴛᴇded:</b>\n<blockquote>{link}</blockquote>",
             reply_markup=reply_markup,
             disable_web_page_preview=True
         )
@@ -110,7 +111,7 @@ async def cancel_batch(client: Client, message: Message):
     if user_id in batch_sessions:
         batch_sessions.pop(user_id)
         await message.reply_text(
-            f"<b>✅ Oᴘᴇʀᴀᴛɪᴏɴ Cᴀɴᴄᴇʟᴇᴅ</b>\n<blockquote>Bᴀᴛᴄʜ ᴏᴘᴇʀᴀᴛɪᴏɴ ᴄᴀɴᴄᴇʟᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ.</blockquote>",
+            f"<b>✅ Oᴘᴇʀᴀᴛɪ6ɴ Cᴀɴᴄᴇʟᴇᴅ</b>\n<blockquote>Bᴀᴛᴄʜ ᴏᴘᴇʀᴀᴛɪᴏɴ ᴄᴀɴᴄᴇʟᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ.</blockquote>",
             disable_web_page_preview=True
         )
     else:
@@ -134,7 +135,7 @@ async def link_generator(client: Client, message: Message):
         try:
             channel_message = await client.ask(
                 chat_id=user_id,
-                text=f"<b><blockquote>Fᴏʀᴡᴀʀᴅ ᴛʜᴇ Mᴇssᴀɢᴇ ғʀᴏᴍ {channel} (ᴡɪᴛʜ ǫᴜᴏᴛᴇs)..</blockquote>\n<blockquote>Oʀ Sᴇɴᴅ ᴛʜᴇ {channel} Pᴏsᴛ Lɪɴᴋ</blockquote></b>",
+                text=f"<b><blockquote>F6ʀᴡ6ʀᴅ ᴛʜᴇ Mᴇss6ɢᴇ ғʀ6ᴍ {channel} (ᴡɪᴛʜ ǫᴜ6ᴛᴇs)..</blockquote>\n<blockquote>Oʀ Sᴇɴᴅ ᴛʜᴇ {channel} P6sᴛ Lɪɴᴋ</blockquote></b>",
                 filters=(filters.forwarded | (filters.text & ~filters.forwarded)),
                 timeout=120,
                 disable_web_page_preview=True
@@ -150,7 +151,7 @@ async def link_generator(client: Client, message: Message):
         else:
             try:
                 await channel_message.reply(
-                    f"<b>❌ Eʀʀᴏʀ..\n<blockquote>Tʜɪs ɪs ɴᴏᴛ ғʀᴏᴍ ᴅʙ ᴄʜᴀɴɴᴇʟ!</blockquote></b>",
+                    f"<b>❌ Eʀʀᴏʀ..\n<blockquote>Tʜɪs ɪs ɴ6ᴛ ғʀ6ᴍ ᴅʙ ᴄʜ6ɴɴᴇʟ!</blockquote></b>",
                     quote=True,
                     disable_web_page_preview=True
                 )
@@ -169,7 +170,7 @@ async def link_generator(client: Client, message: Message):
         
         await client.send_message(
             chat_id=user_id,
-            text=f"<b>✅ Lɪɴᴋ Gᴇɴᴇʀᴀᴛᴇᴅ:</b>\n<blockquote>{link}</blockquote>",
+            text=f"<b>✅ Lɪɴᴋ Gᴇɴᴇʀ6ᴛᴇᴅ:</b>\n<blockquote>{link}</blockquote>",
             reply_markup=reply_markup,
             disable_web_page_preview=True
         )
@@ -181,3 +182,4 @@ async def link_generator(client: Client, message: Message):
         )
     finally:
         batch_sessions.pop(user_id, None)
+        
