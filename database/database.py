@@ -439,7 +439,7 @@ from datetime import datetime, timedelta, timezone
 #   from database import db          (if you have a db.py)
 #   from kingdb import db
 #   from config import db
-from database import db          # ← change this line to your actual import
+from database import database       # ← change this line to your actual import
 
 users_col = db.users             # ← change "users" to your collection name
 
