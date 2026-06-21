@@ -415,3 +415,161 @@ class SidDataBase:
 
 
 kingdb = SidDataBase(DB_URI, DB_NAME)
+
+"""
+database.py  –  MongoDB queries for the stats panel.
+
+Assumes your users collection has documents like:
+{
+    "_id": ...,
+    "user_id": 123456789,
+    "date": datetime(2024, 6, 1, 10, 30)   ← the join date field
+}
+
+Usage in stats.py:
+    from database import get_user_count, get_graph_data
+"""
+
+import calendar
+from datetime import datetime, timedelta, timezone
+
+# ── Import your existing DB connection ──────────────────────────
+# Change this to match however you connect to MongoDB in your bot.
+# Examples:
+#   from database import db          (if you have a db.py)
+#   from kingdb import db
+#   from config import db
+from database import db          # ← change this line to your actual import
+
+users_col = db.users             # ← change "users" to your collection name
+
+
+# ───────────────────────────────────────────────────────────────
+# Internal helper
+# ───────────────────────────────────────────────────────────────
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+async def _count_since(dt: datetime) -> int:
+    """Count users whose `date` field is >= dt."""
+    return await users_col.count_documents({"date": {"$gte": dt}})
+
+
+async def _count_between(start: datetime, end: datetime) -> int:
+    return await users_col.count_documents({
+        "date": {"$gte": start, "$lt": end}
+    })
+
+
+# ───────────────────────────────────────────────────────────────
+# Public: counts
+# ───────────────────────────────────────────────────────────────
+
+async def get_user_count(period: str) -> int:
+    """
+    period → "today" | "weekly" | "monthly" | "mau" | "yearly" | "all"
+    Returns integer count.
+    """
+    now = _now_utc()
+
+    if period == "today":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        return await _count_since(start)
+
+    if period == "weekly":
+        start = now - timedelta(days=7)
+        return await _count_since(start)
+
+    if period == "monthly":
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        return await _count_since(start)
+
+    if period == "mau":
+        # Monthly Active Users = joined in last 30 days
+        start = now - timedelta(days=30)
+        return await _count_since(start)
+
+    if period == "yearly":
+        start = now.replace(month=1, day=1, hour=0, minute=0,
+                            second=0, microsecond=0)
+        return await _count_since(start)
+
+    if period == "all":
+        return await users_col.count_documents({})
+
+    return 0
+
+
+# ───────────────────────────────────────────────────────────────
+# Public: graph data
+# ───────────────────────────────────────────────────────────────
+
+async def get_graph_data(period: str) -> tuple[list, list, str, str]:
+    """
+    Returns (x_labels, y_values, x_axis_title, chart_title).
+    All counts come from MongoDB – no mock data.
+    """
+    now = _now_utc()
+
+    # ── Today: hourly (00:00 → current hour) ──────────────────
+    if period == "today":
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        hours  = [f"{h:02d}:00" for h in range(24)]
+        values = []
+        for h in range(24):
+            h_start = today_start + timedelta(hours=h)
+            h_end   = h_start + timedelta(hours=1)
+            count   = await _count_between(h_start, h_end)
+            values.append(count)
+        return hours, values, "Hour (UTC)", "Hourly User Joins – Today"
+
+    # ── Week: last 7 days ──────────────────────────────────────
+    if period == "week":
+        labels = []
+        values = []
+        for i in range(6, -1, -1):          # 6 days ago → today
+            day_start = (now - timedelta(days=i)).replace(
+                hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timedelta(days=1)
+            count   = await _count_between(day_start, day_end)
+            labels.append(day_start.strftime("%a %d"))
+            values.append(count)
+        return labels, values, "Day", "Daily User Joins – Last 7 Days"
+
+    # ── Month: every day of current month ─────────────────────
+    if period == "month":
+        month_start = now.replace(day=1, hour=0, minute=0,
+                                  second=0, microsecond=0)
+        num_days = calendar.monthrange(now.year, now.month)[1]
+        labels = []
+        values = []
+        for d in range(1, num_days + 1):
+            day_start = month_start.replace(day=d)
+            day_end   = day_start + timedelta(days=1)
+            count     = await _count_between(day_start, day_end)
+            labels.append(str(d))
+            values.append(count)
+        title = f"Daily Joins – {now.strftime('%B %Y')}"
+        return labels, values, "Date", title
+
+    # ── Year: month-wise for current year ─────────────────────
+    if period == "year":
+        month_names = ["Jan","Feb","Mar","Apr","May","Jun",
+                       "Jul","Aug","Sep","Oct","Nov","Dec"]
+        labels = []
+        values = []
+        for m in range(1, 13):
+            m_start = datetime(now.year, m, 1)
+            if m < 12:
+                m_end = datetime(now.year, m + 1, 1)
+            else:
+                m_end = datetime(now.year + 1, 1, 1)
+            count = await _count_between(m_start, m_end)
+            labels.append(month_names[m - 1])
+            values.append(count)
+        return labels, values, "Month", f"Monthly Joins – {now.year}"
+
+    return [], [], "", ""
+        
