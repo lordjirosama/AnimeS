@@ -124,25 +124,44 @@ async def send_text(client: Bot, message: Message):
         await msg.delete()
 
 
-@Bot.on_message(filters.command('status') & filters.private & is_admin)
-async def info(client: Bot, message: Message):   
-    reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Cʟᴏsᴇ ✖️", callback_data = "close")]])
-    
-    start_time = time.time()
-    temp_msg = await message.reply("<b><i>Pʀᴏᴄᴇssɪɴɢ....</i></b>", quote=True)  # Temporary message
-    end_time = time.time()
-    
-    # Calculate ping time in milliseconds
-    ping_time = (end_time - start_time) * 1000
-    
-    users = await kingdb.full_userbase()
-    now = datetime.now()
-    delta = now - client.uptime
-    bottime = get_readable_time(delta.seconds)
-    
-    await temp_msg.edit(f"🚻 : <b>{len(users)} USERS\n\n🤖 UPTIME » {bottime}\n\n📡 PING » {ping_time:.2f} ms</b>", reply_markup = reply_markup,)
+"""
+bot.py  –  Minimal wiring example.
+Paste these lines into your existing bot entry-point.
+"""
+
+from pyrogram import Client, filters
+from pyrogram.types import Message, CallbackQuery
+
+from stats import cmd_status, cb_stats   # ← import from stats.py
+
+# ── your existing Bot client ──
+# Bot = Client(...)
+
+# ── Admin filter (replace with your own logic) ──
+ADMIN_IDS = {123456789}   # put real admin user-ids here
+
+def is_admin(_, __, m):
+    uid = m.from_user.id if m.from_user else None
+    return uid in ADMIN_IDS
+
+admin_filter = filters.create(is_admin)
 
 
+# ────────────────────────────────────────────────
+# Register handlers  (add these to your Bot)
+# ────────────────────────────────────────────────
+
+@Bot.on_message(filters.command("status") & filters.private & admin_filter)
+async def status_cmd(client: Bot, message: Message):
+    await cmd_status(client, message)
+
+
+@Bot.on_callback_query(
+    filters.regex(r"^(stats_|graph_|close)") & admin_filter
+)
+async def stats_callback(client: Bot, query: CallbackQuery):
+    await cb_stats(client, query)
+    
 
     
 #-----------------------------------------------------------------------------------------------------------------------------------------------------------------------#    
