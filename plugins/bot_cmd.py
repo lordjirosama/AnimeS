@@ -1,5 +1,7 @@
 import os
 import asyncio
+from database import database      # ← apna actual DB import
+users_col = db.users          # ← apna collection name
 from asyncio import Lock
 from bot import Bot
 from config import OWNER_ID, SUPPORT_GROUP
@@ -138,7 +140,7 @@ from stats import cmd_status, cb_stats   # ← import from stats.py
 # Bot = Client(...)
 
 # ── Admin filter (replace with your own logic) ──
-ADMIN_IDS = {123456789}   # put real admin user-ids here
+ADMIN_IDS = {8381804732}   # put real admin user-ids here
 
 def is_admin(_, __, m):
     uid = m.from_user.id if m.from_user else None
