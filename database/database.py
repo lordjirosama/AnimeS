@@ -441,7 +441,7 @@ from datetime import datetime, timedelta, timezone
 #   from config import db
 from database import database       # ← change this line to your actual import
 
-users_col = db.users             # ← change "users" to your collection name
+users_col = database.users             # ← change "users" to your collection name
 
 
 # ───────────────────────────────────────────────────────────────
