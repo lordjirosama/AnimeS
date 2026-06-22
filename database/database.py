@@ -440,8 +440,7 @@ from datetime import datetime, timedelta, timezone
 #   from kingdb import db
 #   from config import db
 from database import database       # ← change this line to your actual import
-import database.database as database
-users_col = db.users             # ← change "users" to your collection name
+import database.database as database      # ← change "users" to your collection name
 client = AsyncIOMotorClient(MONGO_URI)
 db = client[DB_NAME]
 
