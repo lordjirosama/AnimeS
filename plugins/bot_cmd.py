@@ -1,7 +1,7 @@
 import os
 import asyncio
 from database import database      # ← apna actual DB import
-users_col = db.users          # ← apna collection name
+users_col = database.users          # ← apna collection name
 from asyncio import Lock
 from bot import Bot
 from config import OWNER_ID, SUPPORT_GROUP
