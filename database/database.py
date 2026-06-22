@@ -441,8 +441,6 @@ from datetime import datetime, timedelta, timezone
 #   from config import db
 from database import database       # ← change this line to your actual import
 import database.database as database      # ← change "users" to your collection name
-client = AsyncIOMotorClient(MONGO_URI)
-db = client[DB_NAME]
 
 # ───────────────────────────────────────────────────────────────
 # Internal helper
