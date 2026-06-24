@@ -190,7 +190,7 @@ def _build_demo_keyboard(keys: list, links: dict) -> InlineKeyboardMarkup:
             QUALITY_BUTTON_LABEL[key],
             url=links[key],
         ))
-        if len(row) == 3:
+        if len(row) == 2:
             rows.append(row)
             row = []
     if row:
@@ -246,7 +246,6 @@ async def _q_finish(
             f"<code>𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
             f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗛𝗗𝗿𝗶𝗽 - {links['hdrip']}</code>"
             "</blockquote>\n\n"
-            "<i>💡 Tap text to copy • Buttons to preview</i>"
         )
 
         # ── Demo buttons (2 per row) ──
@@ -358,7 +357,7 @@ async def quality_cmd(client: Bot, message: Message):
     logger.info(msg); print(msg)
 
     await message.reply(
-        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• HDRip \n/cancel to cancel.",
+        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• HDRip \n press cancel to /cancel.",
         quote=True,
     )
     message.stop_propagation()
@@ -465,8 +464,7 @@ async def _sq_finish(
         parts = " && ".join(f"{QUALITY_DISPLAY[k]} - {links[k]}" for k in required)
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            f"<blockquote>{parts}</blockquote>\n\n"
-            "<i>💡 Tap text to copy • Buttons to preview</i>"
+            f"<blockquote><code>{parts}</code></blockquote>\n\n"
         )
 
         # ── Demo buttons (2 per row) ──
