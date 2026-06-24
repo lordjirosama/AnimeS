@@ -476,7 +476,7 @@ async def _sq_process(
 
         if not has_media(message):
             await message.reply(
-                "⚠️ <b>Pʟᴇᴀsᴇ sᴇɴᴅ ᴀ ғɪʟᴇ</b> (document, video, etc.)",
+                "⚠️ <b>Pʟᴇᴀsᴇ sᴇɴᴅ ᴀ ғɪʟᴇ</b> (document, video, etc.) press to /cancel",
                 quote=True,
             )
             return
@@ -563,7 +563,7 @@ async def squality_cmd(client: Bot, message: Message):
         "<b>Kᴏɴ ᴋᴏɴ sᴀ ǫᴜᴀʟɪᴛʏ sᴋɪᴘ ᴋᴀʀɴᴀ ʜᴀɪ?</b>\n\n"
         "✅ = Cᴏʟʟᴇᴄᴛ ᴋᴀʀᴇɢᴀ\n"
         "❌ = Sᴋɪᴘ ʜᴏ ᴊᴀʏᴇɢᴀ\n\n"
-        "<i>Quality tap karo toggle karne ke liye, fir <b>Confirm</b> dabao.</i>",
+        "<i>Quality tap karo toggle karne ke liye, fir <b>Confirm</b> or /cancel dabao.</i>",
         reply_markup=_sq_build_skip_keyboard(session.skipped),
         quote=True,
     )
