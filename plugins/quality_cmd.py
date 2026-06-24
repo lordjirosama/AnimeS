@@ -67,10 +67,10 @@ except Exception as _e:
 # ─────────────────────────────────────────────────────────
 QUALITY_ORDER = ["480p", "720p", "1080p", "hdrip"]
 QUALITY_DISPLAY = {
-    "480p":   "480p",
-    "720p":   "720p",
-    "1080p":  "1080p",
-    "hdrip": "HDRip",
+    "480p":   "𝟰𝟴𝟬𝗽",
+    "720p":   "𝟳𝟮𝟬𝗽",
+    "1080p":  "𝟭𝟬𝟴𝟬𝗽",
+    "hdrip": "𝗛𝗗𝗿𝗶𝗽",
 }
 _WEB_RE = re.compile(r'\b(hdrip|hd[\s\-]rip|hdtv)\b', re.IGNORECASE)
 
@@ -190,7 +190,7 @@ def _build_demo_keyboard(keys: list, links: dict) -> InlineKeyboardMarkup:
             QUALITY_BUTTON_LABEL[key],
             url=links[key],
         ))
-        if len(row) == 2:
+        if len(row) == 3:
             rows.append(row)
             row = []
     if row:
@@ -358,7 +358,7 @@ async def quality_cmd(client: Bot, message: Message):
     logger.info(msg); print(msg)
 
     await message.reply(
-        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• HDRip /n /cancel to cancel.",
+        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• HDRip \n/cancel to cancel.",
         quote=True,
     )
     message.stop_propagation()
@@ -517,7 +517,7 @@ async def _sq_process(
 
         if not has_media(message):
             await message.reply(
-                "⚠️ <b>Pʟᴇᴀsᴇ sᴇɴᴅ ᴀ ғɪʟᴇ</b> (document, video, etc.) press to /cancel",
+                "⚠️ <b>Pʟᴇᴀsᴇ sᴇɴᴅ ᴀ ғɪʟᴇ</b> (document, video, etc.) press to.",
                 quote=True,
             )
             return
