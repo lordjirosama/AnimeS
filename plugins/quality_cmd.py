@@ -76,10 +76,10 @@ _WEB_RE = re.compile(r'\b(hdrip|hd[\s\-]rip|hdtv)\b', re.IGNORECASE)
 
 # Demo button labels for each quality
 QUALITY_BUTTON_LABEL = {
-    "480p":  "▶️ 480p",
-    "720p":  "▶️ 720p",
-    "1080p": "▶️ 1080p",
-    "hdrip": "▶️ HDRip",
+    "480p":  "𝟰𝟴𝟬𝗽",
+    "720p":  "𝟳𝟮𝟬𝗽",
+    "1080p": "𝟭𝟬𝟴𝟬𝗽",
+    "hdrip": "𝗛𝗗𝗿𝗶𝗽",
 }
 
 
@@ -243,8 +243,8 @@ async def _q_finish(
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
             "<blockquote>"
-            f"𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
-            f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗛𝗗𝗿𝗶𝗽 - {links['hdrip']}"
+            f"<code>𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
+            f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗛𝗗𝗿𝗶𝗽 - {links['hdrip']}</code>"
             "</blockquote>\n\n"
             "<i>💡 Tap text to copy • Buttons to preview</i>"
         )
@@ -358,7 +358,7 @@ async def quality_cmd(client: Bot, message: Message):
     logger.info(msg); print(msg)
 
     await message.reply(
-        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• HDRip",
+        "<b>Sᴇɴᴅ ᴍᴇ ᴛʜᴇsᴇ ǫᴜᴀʟɪᴛʏ ғɪʟᴇs:</b>\n• 480p\n• 720p\n• 1080p\n• HDRip /n /cancel to cancel.",
         quote=True,
     )
     message.stop_propagation()
