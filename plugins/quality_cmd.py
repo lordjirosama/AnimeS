@@ -74,6 +74,14 @@ QUALITY_DISPLAY = {
 }
 _WEB_RE = re.compile(r'\b(hdrip|hd[\s\-]rip|hdtv)\b', re.IGNORECASE)
 
+# Demo button labels for each quality
+QUALITY_BUTTON_LABEL = {
+    "480p":  "▶️ 480p",
+    "720p":  "▶️ 720p",
+    "1080p": "▶️ 1080p",
+    "hdrip": "▶️ HDRip",
+}
+
 
 # ═══════════════════════════════════════════════════════════
 #  SESSION MODELS
@@ -173,6 +181,23 @@ async def _delete_progress(msgs: list) -> None:
             print(f"[Quality] could not delete progress msg: {del_err}")
 
 
+def _build_demo_keyboard(keys: list, links: dict) -> InlineKeyboardMarkup:
+    """Build inline keyboard with one URL button per quality (2 per row)."""
+    rows = []
+    row  = []
+    for key in keys:
+        row.append(InlineKeyboardButton(
+            QUALITY_BUTTON_LABEL[key],
+            url=links[key],
+        ))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    return InlineKeyboardMarkup(rows)
+
+
 # ═══════════════════════════════════════════════════════════
 #  ░░░  /quality  ░░░
 # ═══════════════════════════════════════════════════════════
@@ -214,16 +239,24 @@ async def _q_finish(
 
         await _delete_progress(saved_msgs)
 
+        # ── Text in blockquote (tap-to-copy) ──
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            "<code>"
+            "<blockquote>"
             f"𝟰𝟴𝟬𝗽 - {links['480p']} && 𝟳𝟮𝟬𝗽 - {links['720p']}\n"
             f"𝟭𝟬𝟴𝟬𝗽 - {links['1080p']} && 𝗛𝗗𝗿𝗶𝗽 - {links['hdrip']}"
-            "</code>\n\n"
-            "<i>💡 Tap to copy all links</i>"
+            "</blockquote>\n\n"
+            "<i>💡 Tap text to copy • Buttons to preview</i>"
         )
-      
-        await status.edit(final, disable_web_page_preview=True)
+
+        # ── Demo buttons (2 per row) ──
+        keyboard = _build_demo_keyboard(QUALITY_ORDER, links)
+
+        await status.edit(
+            final,
+            reply_markup=keyboard,
+            disable_web_page_preview=True,
+        )
 
         # ── Sticker → DB channel ──
         STICKER_ID = "CAACAgUAAxkBAAEEXwtqIa-Jx7bGFBePEgd6b33KgQx0ugAChxwAAhmRCVWJiF1D-DjjgjsE"
@@ -235,7 +268,6 @@ async def _q_finish(
 
         msg = f"[Quality] Task done  user={user_id}"
         logger.info(msg); print(msg)
-      
 
     except Exception as exc:
         tb = traceback.format_exc()
@@ -371,7 +403,7 @@ async def quality_file_handler(client: Bot, message: Message):
 
 
 # ═══════════════════════════════════════════════════════════
-#  ░░░  /squality  ░░░
+#  ░░░  /squality  ░══
 # ═══════════════════════════════════════════════════════════
 
 def _sq_build_skip_keyboard(skipped: set) -> InlineKeyboardMarkup:
@@ -429,13 +461,22 @@ async def _sq_finish(
 
         await _delete_progress(saved_msgs)
 
+        # ── Text in blockquote (tap-to-copy) ──
         parts = " && ".join(f"{QUALITY_DISPLAY[k]} - {links[k]}" for k in required)
         final = (
             "<b>🎬 Qᴜᴀʟɪᴛʏ Lɪɴᴋs Rᴇᴀᴅʏ!</b>\n\n"
-            f"<code>{parts}</code>\n\n"
-            "<i>💡 Tap to copy all links</i>"
+            f"<blockquote>{parts}</blockquote>\n\n"
+            "<i>💡 Tap text to copy • Buttons to preview</i>"
         )
-        await status.edit(final, disable_web_page_preview=True)
+
+        # ── Demo buttons (2 per row) ──
+        keyboard = _build_demo_keyboard(required, links)
+
+        await status.edit(
+            final,
+            reply_markup=keyboard,
+            disable_web_page_preview=True,
+        )
 
         # ── Sticker → DB channel ──
         STICKER_ID = "CAACAgUAAxkBAAEEXwtqIa-Jx7bGFBePEgd6b33KgQx0ugAChxwAAhmRCVWJiF1D-DjjgjsE"
@@ -447,7 +488,7 @@ async def _sq_finish(
 
         msg = f"[SQuality] Task done  user={user_id}"
         logger.info(msg); print(msg)
-      
+
     except Exception as exc:
         tb = traceback.format_exc()
         logger.error(f"[SQuality] _finish error  user={user_id}: {exc}")
@@ -632,7 +673,7 @@ async def squality_callback(client: Bot, query: CallbackQuery):
 
         msg = f"[SQuality] Confirmed  user={user_id}  required={required}  skipped={list(session.skipped)}"
         logger.info(msg); print(msg)
-    
+
     else:
         print(f"[SQuality] UNKNOWN callback data={data}  user={user_id}")
 
