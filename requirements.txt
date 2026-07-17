@@ -13,3 +13,4 @@ aiohttp
 
 # --- Advance-Format --- #
 pyrofork==2.3.59
+python-dotenv
