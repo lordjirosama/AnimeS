@@ -30,7 +30,7 @@ LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "0"))
 SUPPORT_GROUP = os.environ.get("SUPPORT_GROUP", "")
 
 #Port
-PORT = os.environ.get("PORT", "")
+PORT = os.environ.get("PORT", "8050")
 
 #Database --⚠️ REQUIRED--
 DB_URI = os.environ.get("DATABASE_URL", "")
