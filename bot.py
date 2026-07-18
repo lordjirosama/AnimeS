@@ -86,3 +86,28 @@ class Bot(Client):
         await super().stop()
         self.LOGGER(__name__).info(f"{self.name} Bot stopped.")
 
+
+# Start Web Server
+        web_runner = web.AppRunner(await web_server())
+        await web_runner.setup()
+        await web.TCPSite(web_runner, "0.0.0.0", PORT).start()
+
+
+from aiohttp import web
+
+routes = web.RouteTableDef()
+
+@routes.get("/", allow_head=True)
+async def root_route_handler(request):
+    return web.json_response("faaaah")
+
+
+
+from aiohttp import web
+from .route import routes
+
+
+async def web_server():
+    web_app = web.Application(client_max_size=30000000)
+    web_app.add_routes(routes)
+    return web_app
