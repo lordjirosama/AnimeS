@@ -2,15 +2,14 @@
 pyrogram 
 TgCrypto 
 pyromod==1.5
-
+uvloop==0.21.0
 # --- For-Database ------------ #
 pymongo 
 dnspython 
 motor  # Async driver for MongoDB
-
+dotenv
 # --- For-Web-Response ------- #
 aiohttp 
-
+requests
 # --- Advance-Format --- #
 pyrofork==2.3.59
-python-dotenv
